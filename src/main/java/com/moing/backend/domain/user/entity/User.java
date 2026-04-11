@@ -58,6 +58,9 @@ public class User {
     @Column(name = "location_terms_agreed", nullable = false)
     private boolean locationTermsAgreed = false;
 
+    @Column(name = "marketing_agreed", nullable = false)
+    private boolean marketingAgreed = false;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -86,8 +89,9 @@ public class User {
     }
 
     // 약관 동의 여부를 업데이트
-    public void updateTerms(boolean termsAgreed, boolean locationTermsAgreed) {
+    public void updateTerms(boolean termsAgreed, boolean locationTermsAgreed, boolean marketingAgreed) {
         this.termsAgreed = termsAgreed;
         this.locationTermsAgreed = locationTermsAgreed;
+        this.marketingAgreed = marketingAgreed;
     }
 }

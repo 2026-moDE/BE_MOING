@@ -18,4 +18,7 @@ public class TermsRequest {
     @NotNull
     @JsonProperty("location_terms_agreed")
     private Boolean locationTermsAgreed;
+
+    @JsonProperty("marketing_agreed")
+    private Boolean marketingAgreed;
 }

@@ -96,6 +96,7 @@ public class AuthService {
             throw new CustomException(ErrorCode.DUPLICATE);
         }
 
-        user.updateTerms(request.getTermsAgreed(), request.getLocationTermsAgreed());
+        user.updateTerms(request.getTermsAgreed(), request.getLocationTermsAgreed(),
+                Boolean.TRUE.equals(request.getMarketingAgreed()));
     }
 }

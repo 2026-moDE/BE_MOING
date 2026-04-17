@@ -1,6 +1,7 @@
 package com.moing.backend.domain.place.controller;
 
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.place.service.PlaceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +22,9 @@ public class PlaceController {
     public ResponseEntity<PlaceNearbyResponse> getNearbyPlaces(
             @RequestParam double latitude,
             @RequestParam double longitude,
-            @RequestParam(defaultValue = "500") int radius
+            @RequestParam(defaultValue = "1500") int radius,
+            @RequestParam String query
     ) {
-        return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius));
+        return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query));
     }
 }

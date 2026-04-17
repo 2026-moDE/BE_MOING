@@ -6,8 +6,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PlaceRepository extends JpaRepository<Place, Long> {
+
+    /** 장소명으로 활성 장소를 조회한다 (네이버 검색 결과 매칭용) */
+    Optional<Place> findByNameAndIsActiveTrue(String name);
 
     /**
      * Haversine 공식으로 반경(미터) 내 활성 장소를 거리 오름차순으로 조회한다.

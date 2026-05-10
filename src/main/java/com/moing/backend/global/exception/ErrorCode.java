@@ -17,7 +17,11 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "리소스를 찾을 수 없습니다"),
     DUPLICATE(HttpStatus.CONFLICT, "이미 존재합니다"),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다");
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다"),
+
+    // --- 온보딩 및 유저 관련 에러 코드 추가 ---
+    DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다"),
+    ALREADY_ONBOARDED(HttpStatus.CONFLICT, "이미 온보딩을 완료한 유저입니다");
 
     private final HttpStatus status;
     private final String message;

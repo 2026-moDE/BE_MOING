@@ -11,6 +11,9 @@ import java.util.Optional;
  */
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // 소셜 로그인 제공자와 소셜 ID로 사용자 조회
+    // 기존 소셜 로그인 조회
     Optional<User> findBySocialProviderAndSocialId(String socialProvider, String socialId);
+
+    // 닉네임 중복 체크 (탈퇴하지 않은 유저 중 검색)
+    boolean existsByNicknameAndDeletedAtIsNull(String nickname);
 }

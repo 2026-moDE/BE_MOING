@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
@@ -25,4 +26,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Optional<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since);
+
+    // quick_tag로 장소 ID 검색
+    @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
+    List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);
 }

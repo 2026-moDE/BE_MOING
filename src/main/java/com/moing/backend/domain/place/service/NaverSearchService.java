@@ -8,6 +8,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -17,6 +18,7 @@ import java.net.URI;
  * 네이버 장소 검색 API 클라이언트
  * GET https://openapi.naver.com/v1/search/local.json
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NaverSearchService {
@@ -48,7 +50,12 @@ public class NaverSearchService {
                 .build()
                 .toUri();
 
-        return restTemplate.exchange(uri, HttpMethod.GET, new HttpEntity<>(headers), NaverLocalResponse.class)
-                .getBody();
+        try {
+            return restTemplate.exchange(uri, HttpMethod.GET, new HttpEntity<>(headers), NaverLocalResponse.class)
+                    .getBody();
+        } catch (RestClientException e) {
+            log.warn("네이버 검색 API 호출 실패: {}", e.getMessage());
+            return null;
+        }
     }
 }

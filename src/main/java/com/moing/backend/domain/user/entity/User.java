@@ -58,6 +58,9 @@ public class User {
     @Column(name = "location_terms_agreed", nullable = false)
     private boolean locationTermsAgreed = false;
 
+    @Column(name = "privacy_agreed", nullable = false)
+    private boolean privacyAgreed = false;
+
     @Column(name = "marketing_agreed", nullable = false)
     private boolean marketingAgreed = false;
 
@@ -88,10 +91,15 @@ public class User {
         this.fcmToken = fcmToken;
     }
 
-    // 약관 동의 여부를 업데이트
-    public void updateTerms(boolean termsAgreed, boolean locationTermsAgreed, boolean marketingAgreed) {
-        this.termsAgreed = termsAgreed;
-        this.locationTermsAgreed = locationTermsAgreed;
-        this.marketingAgreed = marketingAgreed;
+    public void updateOnboardingInfo(String nickname, boolean terms, boolean location, boolean privacy, boolean marketing) {
+        this.nickname = nickname;
+        this.termsAgreed = terms;
+        this.locationTermsAgreed = location;
+        this.privacyAgreed = privacy;
+        this.marketingAgreed = marketing;
+    }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
     }
 }

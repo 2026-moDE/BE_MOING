@@ -1,10 +1,6 @@
 package com.moing.backend.domain.auth.service;
 
-import com.moing.backend.domain.auth.dto.SocialLoginRequest;
-import com.moing.backend.domain.auth.dto.SocialLoginResponse;
-import com.moing.backend.domain.auth.dto.TermsRequest;
-import com.moing.backend.domain.auth.dto.TokenRefreshRequest;
-import com.moing.backend.domain.auth.dto.TokenRefreshResponse;
+import com.moing.backend.domain.auth.dto.*;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.config.JwtTokenProvider;
@@ -74,6 +70,8 @@ public class AuthService {
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+        // 닉네임 뒤에 타임스탬프를 붙여 기존 닉네임 선점을 해제 -> 다른 사용자가 탈퇴한 사람 닉네임 사용 가능하도록
+        user.updateNickname(user.getNickname() + "_deleted_" + System.currentTimeMillis());
         userRepository.delete(user);
     }
 
@@ -86,17 +84,29 @@ public class AuthService {
         return new TokenRefreshResponse(jwtTokenProvider.generateAccessToken(userId));
     }
 
-    // 약관 동의 처리 - 이미 동의한 경우 409 에러
+    // 온보딩 - 닉네임 중복 체크와 유저 정보 업데이트 처리
     @Transactional
-    public void terms(Long userId, TermsRequest request) {
+    public void onboard(Long userId, OnboardingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
+        // 1. 이미 온보딩을 완료한 유저인지 체크 (선택)
         if (user.isTermsAgreed()) {
-            throw new CustomException(ErrorCode.DUPLICATE);
+            throw new CustomException(ErrorCode.ALREADY_ONBOARDED); // 409 에러
         }
 
-        user.updateTerms(request.getTermsAgreed(), request.getLocationTermsAgreed(),
-                Boolean.TRUE.equals(request.getMarketingAgreed()));
+        // 2. 닉네임 중복 체크 (탈퇴하지 않은 유저 중 검색)
+        if (userRepository.existsByNicknameAndDeletedAtIsNull(request.nickname())) {
+            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME); // 409 에러
+        }
+
+        // 3. 정보 업데이트
+        user.updateOnboardingInfo(
+                request.nickname(),
+                request.termsAgreed(),
+                request.locationTermsAgreed(),
+                request.privacyAgreed(),
+                request.marketingAgreed()
+        );
     }
 }

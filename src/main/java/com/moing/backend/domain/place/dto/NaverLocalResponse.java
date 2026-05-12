@@ -17,10 +17,10 @@ public record NaverLocalResponse(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Item(
-            String title,       // 장소명 (HTML 태그 포함 가능, 예: "<b>스타벅스</b>")
-            String category,    // 카테고리 (예: "음식점>카페")
-            String address,     // 지번 주소
-            String roadAddress, // 도로명 주소
+            String title,
+            String category,
+            String address,
+            String roadAddress,
             String mapx,        // 경도(Longitude) * 10^7 좌표
             String mapy         // 위도(Latitude) * 10^7 좌표
     ) {

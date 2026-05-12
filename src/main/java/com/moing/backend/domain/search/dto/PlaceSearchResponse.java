@@ -1,4 +1,4 @@
-package com.moing.backend.domain.place.dto;
+package com.moing.backend.domain.search.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.moing.backend.domain.place.entity.PlaceCategory;

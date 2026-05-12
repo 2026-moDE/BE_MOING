@@ -4,7 +4,8 @@ public enum PlaceCategory {
     FOOD("음식점"),
     CAFE("카페"),
     POPUP("팝업스토어"),
-    PERFORMANCE("공연장"); // '공연'보다 장소 데이터가 더 잘 나오는 '공연장'으로 매핑
+    PERFORMANCE("공연장"),
+    ETC("기타");
 
     private final String searchQuery;
 
@@ -14,5 +15,17 @@ public enum PlaceCategory {
 
     public String getSearchQuery() {
         return searchQuery;
+    }
+
+    // 네이버 카테고리 텍스트(예: "음식점 > 한식")를 분석해 Enum 반환
+    public static PlaceCategory fromNaverCategory(String naverCategory) {
+        if (naverCategory == null) return ETC;
+
+        if (naverCategory.contains("카페") || naverCategory.contains("커피")) return CAFE;
+        if (naverCategory.contains("음식점") || naverCategory.contains("식당")) return FOOD;
+        if (naverCategory.contains("공연") || naverCategory.contains("전시") || naverCategory.contains("미술관")) return PERFORMANCE;
+        if (naverCategory.contains("팝업")) return POPUP;
+
+        return ETC;
     }
 }

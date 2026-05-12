@@ -1,27 +1,19 @@
 package com.moing.backend.domain.place.service;
 
-import com.moing.backend.domain.place.dto.AutocompleteResponse;
 import com.moing.backend.domain.place.dto.NaverLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
-import com.moing.backend.domain.place.dto.PlaceSearchResponse;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
-import com.moing.backend.domain.search.entity.SearchHistory;
-import com.moing.backend.domain.search.repository.SearchHistoryRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 장소 서비스
@@ -35,7 +27,6 @@ public class PlaceService {
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
     private final NaverSearchService naverSearchService;
-    private final SearchHistoryRepository searchHistoryRepository;
 
     /**
      * 주변 장소 조회
@@ -51,7 +42,6 @@ public class PlaceService {
      * @param radius    검색 반경 (m)
      * @param query     네이버 검색어 (예: "카페", "맛집")
      */
-    // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭_
     public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, int radius, String query) {
         NaverLocalResponse naverResult = naverSearchService.search(query);
 
@@ -59,7 +49,6 @@ public class PlaceService {
             return new PlaceNearbyResponse(List.of());
         }
 
-        // 최근 72시간 이내 데이터 추출 기준 시간
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceNearbyResponse.PlaceItem> items = naverResult.items().stream()
@@ -70,43 +59,34 @@ public class PlaceService {
         return new PlaceNearbyResponse(items);
     }
 
-    // Naver 검색 결과 아이템을 PlaceItem DTO로 변환
     private PlaceNearbyResponse.PlaceItem buildPlaceItem(
             NaverLocalResponse.Item naverItem,
             double userLat, double userLng, int radius,
             LocalDateTime since) {
 
-        // 1. 네이버 좌표(10^7) -> WGS84 위경도로 직접 변환
         double itemLng = Double.parseDouble(naverItem.mapx()) / 10_000_000.0;
         double itemLat = Double.parseDouble(naverItem.mapy()) / 10_000_000.0;
 
-        // 2. 반경 내 장소만 포함
         if (!isWithinRadius(userLat, userLng, itemLat, itemLng, radius)) {
             return null;
         }
 
-        // 3. 장소명 기준 내부 DB 매칭
         String name = naverItem.cleanTitle();
         Optional<Place> dbPlace = placeRepository.findByNameAndIsActiveTrue(name);
 
-        // DB에 존재하면 상세 정보 포함해서 반환
         if (dbPlace.isPresent()) {
             return toItem(dbPlace.get(), since);
         }
 
-        // DB에 없으면 네이버 정보만 반환
         return new PlaceNearbyResponse.PlaceItem(null, name, itemLat, itemLng, null, null);
     }
 
-    // DB 엔티티를 응답 DTO로 변환
     private PlaceNearbyResponse.PlaceItem toItem(Place place, LocalDateTime since) {
-        // 최신 혼잡도 레벨 조회 (72시간 이내)
         var congestionLevel = reviewRepository
                 .findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(place.getId(), since)
                 .map(Review::getCongestionLevel)
                 .orElse(null);
 
-        // 대표 이미지 조회 (72시간 이내)
         var thumbnailUrl = reviewRepository
                 .findTopWithImageByPlaceId(place.getId(), since)
                 .map(Review::getImageUrl)
@@ -122,124 +102,9 @@ public class PlaceService {
         );
     }
 
-    /**
-     * 장소 검색
-     * keyword가 #으로 시작하면 quick_tag 기반 리뷰 검색,
-     * 아니면 네이버 검색 API 호출 후 내부 DB 매칭 (홈화면 주변 장소 조회와 동일한 방식).
-     * 결과에 72h 이내 혼잡도·대표 사진을 조합하고 검색어를 search_history에 저장한다.
-     */
-    @Transactional
-    public PlaceSearchResponse searchPlaces(Long userId, String keyword) {
-        LocalDateTime since = LocalDateTime.now().minusHours(72);
-
-        List<PlaceSearchResponse.PlaceItem> items;
-        if (keyword.startsWith("#")) {
-            String tag = keyword.substring(1);
-            List<Long> placeIds = reviewRepository.findPlaceIdsByQuickTag(tag);
-            List<Place> places = placeIds.isEmpty() ? List.of() : placeRepository.findByIdInAndIsActiveTrue(placeIds);
-            items = places.stream().map(place -> toSearchItem(place, since)).toList();
-        } else {
-            NaverLocalResponse naverResult = naverSearchService.search(keyword);
-            if (naverResult == null || naverResult.items() == null) {
-                items = List.of();
-            } else {
-                items = naverResult.items().stream()
-                        .map(naverItem -> buildSearchItem(naverItem, since))
-                        .toList();
-            }
-        }
-
-        searchHistoryRepository.save(SearchHistory.builder()
-                .userId(userId)
-                .keyword(keyword)
-                .build());
-
-        return new PlaceSearchResponse(items);
-    }
-
-    // 네이버 검색 결과 → 내부 DB 매칭 → PlaceSearchResponse.PlaceItem 변환 (반경 필터링 없음)
-    private PlaceSearchResponse.PlaceItem buildSearchItem(NaverLocalResponse.Item naverItem, LocalDateTime since) {
-        String name = naverItem.cleanTitle();
-        String address = (naverItem.roadAddress() != null && !naverItem.roadAddress().isBlank())
-                ? naverItem.roadAddress() : naverItem.address();
-
-        Optional<Place> dbPlace = placeRepository.findByNameAndIsActiveTrue(name);
-        if (dbPlace.isPresent()) {
-            return toSearchItem(dbPlace.get(), since);
-        }
-
-        // DB에 없으면 네이버 정보만 반환 (혼잡도·카테고리·thumbnail 없음)
-        return new PlaceSearchResponse.PlaceItem(null, name, address, null, null, null);
-    }
-
-    private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {
-        var congestionLevel = reviewRepository
-                .findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(place.getId(), since)
-                .map(Review::getCongestionLevel)
-                .orElse(null);
-
-        var thumbnailUrl = reviewRepository
-                .findTopWithImageByPlaceId(place.getId(), since)
-                .map(Review::getImageUrl)
-                .orElse(null);
-
-        return new PlaceSearchResponse.PlaceItem(
-                place.getId(),
-                place.getName(),
-                place.getAddress(),
-                place.getCategory(),
-                congestionLevel,
-                thumbnailUrl
-        );
-    }
-
-    /**
-     * 검색 자동완성
-     * 네이버 검색 결과 상위 10개를 반환하며, 내부 DB에 존재하는 장소는 id를 포함한다.
-     */
-    public AutocompleteResponse autocomplete(String keyword) {
-        NaverLocalResponse naverResult = naverSearchService.search(keyword);
-
-        if (naverResult == null || naverResult.items() == null) {
-            return new AutocompleteResponse(List.of());
-        }
-
-        List<NaverLocalResponse.Item> top10 = naverResult.items().stream()
-                .limit(10)
-                .toList();
-
-        // 장소명 기준으로 DB 일괄 조회
-        List<String> names = top10.stream().map(NaverLocalResponse.Item::cleanTitle).toList();
-        Map<String, Place> dbPlaceByName = placeRepository.findByNameInAndIsActiveTrue(names).stream()
-                .collect(Collectors.toMap(Place::getName, Function.identity()));
-
-        List<AutocompleteResponse.Suggestion> suggestions = top10.stream()
-                .map(item -> {
-                    String name = item.cleanTitle();
-                    String address = (item.roadAddress() != null && !item.roadAddress().isBlank())
-                            ? item.roadAddress() : item.address();
-                    String category = mapNaverCategory(item.category());
-                    Long id = dbPlaceByName.containsKey(name) ? dbPlaceByName.get(name).getId() : null;
-                    return new AutocompleteResponse.Suggestion(id, name, address, category);
-                })
-                .toList();
-
-        return new AutocompleteResponse(suggestions);
-    }
-
-    /** 네이버 카테고리 문자열을 자동완성 카테고리로 매핑 */
-    private String mapNaverCategory(String naverCategory) {
-        if (naverCategory == null) return "ETC";
-        if (naverCategory.contains("카페")) return "CAFE";
-        if (naverCategory.contains("음식점")) return "RESTAURANT";
-        if (naverCategory.contains("공연") || naverCategory.contains("전시")) return "CONCERT";
-        return "ETC";
-    }
-
-    // Haversine 공식을 이용한 거리 계산 및 반경 필터링
     private boolean isWithinRadius(double userLat, double userLng,
                                    double itemLat, double itemLng, int radius) {
-        final int EARTH_RADIUS = 6_371_000; // 지구 반지름 (m)
+        final int EARTH_RADIUS = 6_371_000;
         double dLat = Math.toRadians(itemLat - userLat);
         double dLon = Math.toRadians(itemLng - userLng);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)

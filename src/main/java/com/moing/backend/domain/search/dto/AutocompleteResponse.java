@@ -1,4 +1,4 @@
-package com.moing.backend.domain.place.dto;
+package com.moing.backend.domain.search.dto;
 
 import java.util.List;
 

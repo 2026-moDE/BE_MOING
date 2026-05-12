@@ -32,27 +32,39 @@ public class AuthService {
             default -> throw new CustomException(ErrorCode.INVALID_INPUT);
         };
 
-        boolean[] isNew = {false};
-        User user = userRepository.findBySocialProviderAndSocialId(provider, userInfo.socialId())
-                .orElseGet(() -> {
-                    isNew[0] = true;
-                    return userRepository.save(User.builder()
-                            .socialProvider(provider)
-                            .socialId(userInfo.socialId())
-                            .nickname(userInfo.nickname())
-                            .profileImageUrl(userInfo.profileImageUrl())
-                            .fcmToken(request.getFcmToken())
-                            .build());
-                });
+        // 탈퇴 유저 포함 전체 조회로 재가입 케이스 감지
+        User user;
+        boolean isNew = false;
+        var existing = userRepository.findBySocialProviderAndSocialIdIncludeDeleted(provider, userInfo.socialId());
 
-        if (!isNew[0] && request.getFcmToken() != null) {
-            user.updateFcmToken(request.getFcmToken());
+        if (existing.isPresent()) {
+            user = existing.get();
+            if (user.getDeletedAt() != null) {
+                // 탈퇴 후 재가입: 계정 복구 후 신규 유저로 처리 (온보딩 다시 진행)
+                user.restore(request.getFcmToken());
+                isNew = true;
+            } else {
+                // 기존 활성 유저: FCM 토큰만 갱신
+                if (request.getFcmToken() != null) {
+                    user.updateFcmToken(request.getFcmToken());
+                }
+            }
+        } else {
+            // 완전히 신규 유저
+            isNew = true;
+            user = userRepository.save(User.builder()
+                    .socialProvider(provider)
+                    .socialId(userInfo.socialId())
+                    .nickname(userInfo.nickname())
+                    .profileImageUrl(userInfo.profileImageUrl())
+                    .fcmToken(request.getFcmToken())
+                    .build());
         }
 
         return SocialLoginResponse.builder()
                 .accessToken(jwtTokenProvider.generateAccessToken(user.getId()))
                 .refreshToken(jwtTokenProvider.generateRefreshToken(user.getId()))
-                .newUser(isNew[0])
+                .newUser(isNew)
                 .user(SocialLoginResponse.UserInfo.from(user))
                 .build();
     }

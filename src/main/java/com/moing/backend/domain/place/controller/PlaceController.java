@@ -1,8 +1,8 @@
 package com.moing.backend.domain.place.controller;
 
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
-import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.place.service.PlaceService;
+import com.moing.backend.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,14 +17,14 @@ public class PlaceController {
 
     private final PlaceService placeService;
 
-    // JWT 인증된 사용자만 접근 가능 (JwtAuthenticationFilter + SecurityConfig에서 보호)
+    // 주변 장소 목록 조회
     @GetMapping("/nearby")
-    public ResponseEntity<PlaceNearbyResponse> getNearbyPlaces(
+    public ResponseEntity<ApiResponse<PlaceNearbyResponse>> getNearbyPlaces(
             @RequestParam double latitude,
             @RequestParam double longitude,
             @RequestParam(defaultValue = "1500") int radius,
             @RequestParam String query
     ) {
-        return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query));
+        return ResponseEntity.ok(ApiResponse.success("success", placeService.getNearbyPlaces(latitude, longitude, radius, query)));
     }
 }

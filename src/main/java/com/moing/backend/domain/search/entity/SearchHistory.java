@@ -1,7 +1,8 @@
-package com.moing.backend.domain.review.entity;
+package com.moing.backend.domain.search.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -10,33 +11,29 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reviews")
+@Table(name = "search_history")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Review {
+public class SearchHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "place_id", nullable = false)
-    private Long placeId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "congestion_level", length = 10)
-    private CongestionLevel congestionLevel;
-
-    @Column(name = "quick_tag", length = 50)
-    private String quickTag;
-
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
-
-    @Column(name = "helpful_count", nullable = false)
-    private int helpfulCount;
+    @Column(nullable = false, length = 200)
+    private String keyword;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Builder
+    public SearchHistory(Long userId, String keyword) {
+        this.userId = userId;
+        this.keyword = keyword;
+    }
 }

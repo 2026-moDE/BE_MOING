@@ -40,4 +40,14 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radius") int radius);
+
+    /** keyword가 name 또는 address에 포함된 활성 장소를 조회한다 */
+    @Query("SELECT p FROM Place p WHERE p.isActive = true AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(p.address) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<Place> searchByNameOrAddress(@Param("keyword") String keyword);
+
+    /** quick_tag 검색 결과로 얻은 placeId 목록에 해당하는 활성 장소를 조회한다 */
+    List<Place> findByIdInAndIsActiveTrue(List<Long> ids);
+
+    /** 장소명 목록으로 활성 장소를 일괄 조회한다 (자동완성 N+1 방지) */
+    List<Place> findByNameInAndIsActiveTrue(List<String> names);
 }

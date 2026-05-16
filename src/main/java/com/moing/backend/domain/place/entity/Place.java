@@ -47,6 +47,7 @@ public class Place {
     @Column(length = 20)
     private String source;
 
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 

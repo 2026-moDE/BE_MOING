@@ -1,10 +1,6 @@
 package com.moing.backend.domain.auth.controller;
 
-import com.moing.backend.domain.auth.dto.SocialLoginRequest;
-import com.moing.backend.domain.auth.dto.SocialLoginResponse;
-import com.moing.backend.domain.auth.dto.TermsRequest;
-import com.moing.backend.domain.auth.dto.TokenRefreshRequest;
-import com.moing.backend.domain.auth.dto.TokenRefreshResponse;
+import com.moing.backend.domain.auth.dto.*;
 import com.moing.backend.domain.auth.service.AuthService;
 import com.moing.backend.global.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -12,15 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * Auth 컨트롤러
- * 소셜 로그인, 토큰 재발급, 약관 동의, 로그아웃, 회원탈퇴 API를 제공한다.
+ * 소셜 로그인, 토큰 재발급, 온보딩, 로그아웃, 회원탈퇴 API를 제공한다.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -61,12 +53,13 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("토큰 재발급 성공", response));
     }
 
-    // 약관 동의
-    @PostMapping("/terms")
-    public ResponseEntity<ApiResponse<Void>> terms(
+    // 온보딩
+    @PatchMapping("/onboarding")
+    public ResponseEntity<Void> onboardUser(
             @AuthenticationPrincipal Long userId,
-            @RequestBody @Valid TermsRequest request) {
-        authService.terms(userId, request);
-        return ResponseEntity.ok(ApiResponse.success("약관 동의 완료", null));
+            @RequestBody OnboardingRequest request
+    ) {
+        authService.onboard(userId, request);
+        return ResponseEntity.ok().build();
     }
 }

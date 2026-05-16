@@ -1,10 +1,6 @@
 package com.moing.backend.domain.auth.service;
 
-import com.moing.backend.domain.auth.dto.SocialLoginRequest;
-import com.moing.backend.domain.auth.dto.SocialLoginResponse;
-import com.moing.backend.domain.auth.dto.TermsRequest;
-import com.moing.backend.domain.auth.dto.TokenRefreshRequest;
-import com.moing.backend.domain.auth.dto.TokenRefreshResponse;
+import com.moing.backend.domain.auth.dto.*;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.config.JwtTokenProvider;
@@ -36,27 +32,39 @@ public class AuthService {
             default -> throw new CustomException(ErrorCode.INVALID_INPUT);
         };
 
-        boolean[] isNew = {false};
-        User user = userRepository.findBySocialProviderAndSocialId(provider, userInfo.socialId())
-                .orElseGet(() -> {
-                    isNew[0] = true;
-                    return userRepository.save(User.builder()
-                            .socialProvider(provider)
-                            .socialId(userInfo.socialId())
-                            .nickname(userInfo.nickname())
-                            .profileImageUrl(userInfo.profileImageUrl())
-                            .fcmToken(request.getFcmToken())
-                            .build());
-                });
+        // 탈퇴 유저 포함 전체 조회로 재가입 케이스 감지
+        User user;
+        boolean isNew = false;
+        var existing = userRepository.findBySocialProviderAndSocialIdIncludeDeleted(provider, userInfo.socialId());
 
-        if (!isNew[0] && request.getFcmToken() != null) {
-            user.updateFcmToken(request.getFcmToken());
+        if (existing.isPresent()) {
+            user = existing.get();
+            if (user.getDeletedAt() != null) {
+                // 탈퇴 후 재가입: 계정 복구 후 신규 유저로 처리 (온보딩 다시 진행)
+                user.restore(request.getFcmToken());
+                isNew = true;
+            } else {
+                // 기존 활성 유저: FCM 토큰만 갱신
+                if (request.getFcmToken() != null) {
+                    user.updateFcmToken(request.getFcmToken());
+                }
+            }
+        } else {
+            // 완전히 신규 유저
+            isNew = true;
+            user = userRepository.save(User.builder()
+                    .socialProvider(provider)
+                    .socialId(userInfo.socialId())
+                    .nickname(userInfo.nickname())
+                    .profileImageUrl(userInfo.profileImageUrl())
+                    .fcmToken(request.getFcmToken())
+                    .build());
         }
 
         return SocialLoginResponse.builder()
                 .accessToken(jwtTokenProvider.generateAccessToken(user.getId()))
                 .refreshToken(jwtTokenProvider.generateRefreshToken(user.getId()))
-                .newUser(isNew[0])
+                .newUser(isNew)
                 .user(SocialLoginResponse.UserInfo.from(user))
                 .build();
     }
@@ -74,6 +82,8 @@ public class AuthService {
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+        // 닉네임 뒤에 타임스탬프를 붙여 기존 닉네임 선점을 해제 -> 다른 사용자가 탈퇴한 사람 닉네임 사용 가능하도록
+        user.updateNickname(user.getNickname() + "_deleted_" + System.currentTimeMillis());
         userRepository.delete(user);
     }
 
@@ -86,17 +96,29 @@ public class AuthService {
         return new TokenRefreshResponse(jwtTokenProvider.generateAccessToken(userId));
     }
 
-    // 약관 동의 처리 - 이미 동의한 경우 409 에러
+    // 온보딩 - 닉네임 중복 체크와 유저 정보 업데이트 처리
     @Transactional
-    public void terms(Long userId, TermsRequest request) {
+    public void onboard(Long userId, OnboardingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
+        // 1. 이미 온보딩을 완료한 유저인지 체크 (선택)
         if (user.isTermsAgreed()) {
-            throw new CustomException(ErrorCode.DUPLICATE);
+            throw new CustomException(ErrorCode.ALREADY_ONBOARDED); // 409 에러
         }
 
-        user.updateTerms(request.getTermsAgreed(), request.getLocationTermsAgreed(),
-                Boolean.TRUE.equals(request.getMarketingAgreed()));
+        // 2. 닉네임 중복 체크 (탈퇴하지 않은 유저 중 검색)
+        if (userRepository.existsByNicknameAndDeletedAtIsNull(request.nickname())) {
+            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME); // 409 에러
+        }
+
+        // 3. 정보 업데이트
+        user.updateOnboardingInfo(
+                request.nickname(),
+                request.termsAgreed(),
+                request.locationTermsAgreed(),
+                request.privacyAgreed(),
+                request.marketingAgreed()
+        );
     }
 }

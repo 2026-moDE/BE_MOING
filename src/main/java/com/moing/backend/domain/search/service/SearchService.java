@@ -9,7 +9,12 @@ import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.search.dto.AutocompleteResponse;
 import com.moing.backend.domain.search.dto.PlaceSearchResponse;
+import com.moing.backend.domain.search.dto.SearchHistoryResponse;
+import com.moing.backend.domain.search.repository.SearchHistoryRepository;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +30,7 @@ public class SearchService {
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
     private final NaverSearchService naverSearchService;
+    private final SearchHistoryRepository searchHistoryRepository;
 
     /**
      * 장소 검색
@@ -78,6 +84,37 @@ public class SearchService {
                 .toList();
 
         return new AutocompleteResponse(suggestions);
+    }
+
+    /**
+     * 최근 검색어 전체 삭제
+     */
+    @Transactional
+    public void deleteAllSearchHistory(Long userId) {
+        searchHistoryRepository.deleteAllByUserId(userId);
+    }
+
+    /**
+     * 최근 검색어 개별 삭제
+     */
+    @Transactional
+    public void deleteSearchHistory(Long id, Long userId) {
+        if (!searchHistoryRepository.existsByIdAndUserId(id, userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+        searchHistoryRepository.deleteById(id);
+    }
+
+    /**
+     * 최근 검색어 목록 조회 (최대 20건, 최신순)
+     */
+    public SearchHistoryResponse getSearchHistory(Long userId) {
+        List<SearchHistoryResponse.HistoryItem> items = searchHistoryRepository
+                .findRecentByUserId(userId, PageRequest.of(0, 20))
+                .stream()
+                .map(SearchHistoryResponse.HistoryItem::from)
+                .toList();
+        return new SearchHistoryResponse(items);
     }
 
     private PlaceSearchResponse.PlaceItem buildSearchItem(NaverLocalResponse.Item naverItem, LocalDateTime since) {

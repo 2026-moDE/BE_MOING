@@ -1,7 +1,10 @@
 package com.moing.backend.domain.place.service;
 
+import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.NaverLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.review.entity.Review;
@@ -114,17 +117,37 @@ public class PlaceService {
         );
     }
 
+    /**
+     * 위치 인증
+     * 사용자 좌표와 장소 좌표 간 거리를 계산하여 50m 이내면 인증 성공으로 반환한다.
+     */
+    public LocationVerifyResponse verifyLocation(Long placeId, double latitude, double longitude) {
+        Place place = placeRepository.findById(placeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        int distance = calculateDistance(
+                latitude, longitude,
+                place.getLatitude().doubleValue(),
+                place.getLongitude().doubleValue()
+        );
+
+        return new LocationVerifyResponse(distance <= 50, distance);
+    }
+
+    // Haversine 공식으로 두 좌표 간 거리(m) 반환
+    private int calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+        final int EARTH_RADIUS = 6_371_000;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return (int) Math.round(EARTH_RADIUS * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a)));
+    }
+
     // Haversine 공식을 이용한 거리 계산 및 반경 필터링
     private boolean isWithinRadius(double userLat, double userLng,
                                    double itemLat, double itemLng, int radius) {
-        final int EARTH_RADIUS = 6_371_000; // 지구 반지름 (m)
-        double dLat = Math.toRadians(itemLat - userLat);
-        double dLon = Math.toRadians(itemLng - userLng);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(userLat)) * Math.cos(Math.toRadians(itemLat))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double dist = EARTH_RADIUS * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
-
-        return dist <= radius;
+        return calculateDistance(userLat, userLng, itemLat, itemLng) <= radius;
     }
 }

@@ -10,6 +10,7 @@ import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.search.dto.AutocompleteResponse;
 import com.moing.backend.domain.search.dto.PlaceSearchResponse;
 import com.moing.backend.domain.search.dto.SearchHistoryResponse;
+import com.moing.backend.domain.search.entity.SearchHistory;
 import com.moing.backend.domain.search.repository.SearchHistoryRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -38,7 +39,10 @@ public class SearchService {
      * 네이버 검색 API 호출 후 내부 DB 매칭.
      * 결과에 72h 이내 혼잡도·대표 사진을 조합하고 검색어를 search_history에 저장한다.
      */
+    @Transactional
     public PlaceSearchResponse searchPlaces(Long userId, String keyword) {
+        searchHistoryRepository.save(new SearchHistory(userId, keyword));
+
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceSearchResponse.PlaceItem> items;

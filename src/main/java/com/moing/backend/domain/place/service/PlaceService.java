@@ -2,11 +2,14 @@ package com.moing.backend.domain.place.service;
 
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.NaverLocalResponse;
+import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.repository.PlaceSubscriptionRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
+import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,7 @@ public class PlaceService {
 
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
+    private final PlaceSubscriptionRepository placeSubscriptionRepository;
     private final NaverSearchService naverSearchService;
 
     /**
@@ -114,6 +118,37 @@ public class PlaceService {
                 place.getLongitude().doubleValue(),
                 congestionLevel,
                 thumbnailUrl
+        );
+    }
+
+    /**
+     * 장소 상세 조회
+     * Place 정보, 구독 여부, 최신 혼잡도(72h), 리뷰 수(72h)를 조합해 반환한다.
+     */
+    public PlaceDetailResponse getPlaceDetail(Long userId, Long placeId) {
+        Place place = placeRepository.findById(placeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        LocalDateTime since = LocalDateTime.now().minusHours(72);
+
+        boolean isSubscribed = placeSubscriptionRepository.existsByUserIdAndPlaceId(userId, placeId);
+
+        CongestionLevel congestionLevel = reviewRepository
+                .findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(placeId, since)
+                .map(Review::getCongestionLevel)
+                .orElse(null);
+
+        long reviewCount = reviewRepository.countByPlaceIdAndCreatedAtAfter(placeId, since);
+
+        return new PlaceDetailResponse(
+                place.getId(),
+                place.getName(),
+                place.getAddress(),
+                place.getCategory(),
+                place.getBusinessHours(),
+                isSubscribed,
+                congestionLevel,
+                reviewCount
         );
     }
 

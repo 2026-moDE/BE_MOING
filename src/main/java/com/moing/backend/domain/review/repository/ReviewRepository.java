@@ -27,6 +27,9 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since);
 
+    // 72h 이내 리뷰 수 (상세 조회용)
+    long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);
+
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);

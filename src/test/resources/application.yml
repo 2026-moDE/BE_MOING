@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    show-sql: true
+
+jwt:
+  secret: test-secret-key-for-testing-purposes-only-32chars
+  access-token-expiration: 3600000
+  refresh-token-expiration: 1209600000
+
+kakao:
+  api-key: test-kakao-api-key
+  user-info-url: https://kapi.kakao.com/v2/user/me

@@ -1,6 +1,7 @@
 package com.moing.backend.domain.place.controller;
 
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
+import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
 import com.moing.backend.domain.place.service.PlaceService;
 import com.moing.backend.global.exception.CustomException;
@@ -21,6 +22,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlaceController {
 
     private final PlaceService placeService;
+
+    // 장소 상세 조회
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<PlaceDetailResponse>> getPlaceDetail(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(placeService.getPlaceDetail(userId, id)));
+    }
 
     // 위치 인증 확인
     @GetMapping("/{id}/verify-location")

@@ -59,6 +59,14 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("cursor") Long cursor,
             Pageable pageable);
 
+    // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 수 조회
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
+    long countByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
+
+    // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 목록 조회
+    @Query("SELECT r FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
+    List<Review> findByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
+
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);

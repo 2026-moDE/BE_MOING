@@ -52,14 +52,22 @@ public class PlaceService {
      */
     // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭_
     public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, int radius, String query) {
+        LocalDateTime since = LocalDateTime.now().minusHours(72);
+
+        // query 없으면 DB에서 반경 내 장소(리뷰 있는 버블)만 반환
+        if (query == null || query.isBlank()) {
+            List<PlaceNearbyResponse.PlaceItem> items = placeRepository.findNearby(latitude, longitude, radius)
+                    .stream()
+                    .map(place -> toItem(place, since))
+                    .toList();
+            return new PlaceNearbyResponse(items);
+        }
+
         NaverLocalResponse naverResult = naverSearchService.search(query);
 
         if (naverResult == null || naverResult.items() == null) {
             return new PlaceNearbyResponse(List.of());
         }
-
-        // 최근 72시간 이내 데이터 추출 기준 시간
-        LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceNearbyResponse.PlaceItem> items = naverResult.items().stream()
                 .map(item -> buildPlaceItem(item, latitude, longitude, radius, since))

@@ -58,7 +58,7 @@ public class PlaceService {
 
         // query 없으면 DB에서 반경 내 장소(리뷰 있는 버블)만 반환
         if (query == null || query.isBlank()) {
-            List<PlaceNearbyResponse.PlaceItem> items = placeRepository.findNearby(latitude, longitude, radius)
+            List<PlaceNearbyResponse.PlaceItem> items = placeRepository.findNearby(latitude, longitude, radius, since)
                     .stream()
                     .map(place -> toItem(place, since))
                     .toList();

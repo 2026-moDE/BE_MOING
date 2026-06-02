@@ -22,18 +22,18 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             FROM places p
             WHERE p.is_active = true
               AND (6371000 * acos(
-                    LEAST(1.0,
+                    GREATEST(-1.0, LEAST(1.0,
                       cos(radians(:lat)) * cos(radians(p.latitude))
                       * cos(radians(p.longitude) - radians(:lng))
                       + sin(radians(:lat)) * sin(radians(p.latitude))
-                    )
+                    ))
                   )) <= :radius
             ORDER BY (6371000 * acos(
-                    LEAST(1.0,
+                    GREATEST(-1.0, LEAST(1.0,
                       cos(radians(:lat)) * cos(radians(p.latitude))
                       * cos(radians(p.longitude) - radians(:lng))
                       + sin(radians(:lat)) * sin(radians(p.latitude))
-                    )
+                    ))
                   )) ASC
             """, nativeQuery = true)
     List<Place> findNearby(

@@ -1,5 +1,6 @@
 package com.moing.backend.domain.review.service;
 
+import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.review.dto.ReviewCreateRequest;
 import com.moing.backend.domain.review.dto.ReviewCreateResponse;
@@ -34,13 +35,11 @@ public class ReviewService {
     // 리뷰 작성
     @Transactional
     public ReviewCreateResponse createReview(Long userId, ReviewCreateRequest request) {
-        if (!placeRepository.existsById(request.placeId())) {
-            throw new CustomException(ErrorCode.NOT_FOUND);
-        }
+        Long placeId = resolveOrCreatePlaceId(request);
 
         Review review = Review.builder()
                 .userId(userId)
-                .placeId(request.placeId())
+                .placeId(placeId)
                 .congestionLevel(request.congestionLevel())
                 .quickTag(request.quickTag())
                 .comment(request.comment())
@@ -52,6 +51,30 @@ public class ReviewService {
         return ReviewCreateResponse.from(reviewRepository.save(review));
     }
 
+    // placeId가 있으면 존재 확인, 없으면 새 장소 생성 후 id 반환
+    private Long resolveOrCreatePlaceId(ReviewCreateRequest request) {
+        if (request.placeId() != null) {
+            if (!placeRepository.existsById(request.placeId())) {
+                throw new CustomException(ErrorCode.NOT_FOUND);
+            }
+            return request.placeId();
+        }
+
+        if (request.placeName() == null || request.placeAddress() == null
+                || request.placeLatitude() == null || request.placeLongitude() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        Place newPlace = Place.builder()
+                .name(request.placeName())
+                .address(request.placeAddress())
+                .latitude(request.placeLatitude())
+                .longitude(request.placeLongitude())
+                .category(request.placeCategory())
+                .source("USER")
+                .build();
+
+        return placeRepository.save(newPlace).getId();
     // 현재 리뷰 목록 (72h 이내, 커서 기반)
     @Transactional(readOnly = true)
     public ReviewListResponse getCurrentReviews(Long placeId, Long userId, Long cursor, int limit) {

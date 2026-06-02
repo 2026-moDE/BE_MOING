@@ -24,9 +24,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.imageUrl IS NOT NULL
             ORDER BY r.helpfulCount DESC, r.createdAt DESC
             """)
-    Optional<Review> findTopWithImageByPlaceId(
+    List<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
-            @Param("since") LocalDateTime since);
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
 
     // 72h 이내 리뷰 수 (상세 조회용)
     long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);

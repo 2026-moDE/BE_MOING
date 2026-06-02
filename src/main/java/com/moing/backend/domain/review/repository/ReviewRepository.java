@@ -1,6 +1,7 @@
 package com.moing.backend.domain.review.repository;
 
 import com.moing.backend.domain.review.entity.Review;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,6 +27,37 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Optional<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since);
+
+    // 72h 이내 리뷰 수 (상세 조회용)
+    long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);
+
+    // 72h 이내 커서 기반 조회 (현재 리뷰)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt > :since
+              AND (:cursor IS NULL OR r.id < :cursor)
+            ORDER BY r.id DESC
+            """)
+    List<Review> findCurrentReviews(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            @Param("cursor") Long cursor,
+            Pageable pageable);
+
+    // 72h 경과 커서 기반 조회 (과거 리뷰)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt <= :since
+              AND (:cursor IS NULL OR r.id < :cursor)
+            ORDER BY r.id DESC
+            """)
+    List<Review> findArchivedReviews(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            @Param("cursor") Long cursor,
+            Pageable pageable);
 
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")

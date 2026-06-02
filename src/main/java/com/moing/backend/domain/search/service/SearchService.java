@@ -10,6 +10,7 @@ import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.search.dto.AutocompleteResponse;
 import com.moing.backend.domain.search.dto.PlaceSearchResponse;
 import com.moing.backend.domain.search.dto.SearchHistoryResponse;
+import com.moing.backend.domain.search.entity.SearchHistory;
 import com.moing.backend.domain.search.repository.SearchHistoryRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +40,10 @@ public class SearchService {
      * 네이버 검색 API 호출 후 내부 DB 매칭.
      * 결과에 72h 이내 혼잡도·대표 사진을 조합하고 검색어를 search_history에 저장한다.
      */
+    @Transactional
     public PlaceSearchResponse searchPlaces(Long userId, String keyword) {
+        searchHistoryRepository.save(new SearchHistory(userId, keyword));
+
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceSearchResponse.PlaceItem> items;
@@ -119,13 +124,29 @@ public class SearchService {
 
     private PlaceSearchResponse.PlaceItem buildSearchItem(NaverLocalResponse.Item naverItem, LocalDateTime since) {
         String name = naverItem.cleanTitle();
-        String address = naverItem.roadAddress() != null ? naverItem.roadAddress() : naverItem.address();
+        String address = naverItem.roadAddress() != null && !naverItem.roadAddress().isBlank()
+                ? naverItem.roadAddress() : naverItem.address();
         PlaceCategory category = PlaceCategory.fromNaverCategory(naverItem.category());
 
-        // DB에 있는 장소면 혼잡도·썸네일 포함, 없으면 네이버 정보만 반환
-        return placeRepository.findByNameAndIsActiveTrue(name)
-                .map(place -> toSearchItem(place, since))
-                .orElse(new PlaceSearchResponse.PlaceItem(null, name, address, category, null, null));
+        // DB에 있으면 혼잡도·썸네일 포함, 없으면 upsert 후 반환
+        Optional<Place> existing = placeRepository.findByNameAndIsActiveTrue(name);
+        if (existing.isPresent()) {
+            return toSearchItem(existing.get(), since);
+        }
+
+        BigDecimal latitude = new BigDecimal(naverItem.mapy()).movePointLeft(7);
+        BigDecimal longitude = new BigDecimal(naverItem.mapx()).movePointLeft(7);
+
+        Place saved = placeRepository.save(Place.builder()
+                .name(name)
+                .address(address)
+                .latitude(latitude)
+                .longitude(longitude)
+                .category(category)
+                .source("NAVER")
+                .build());
+
+        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, null, null);
     }
 
     private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {

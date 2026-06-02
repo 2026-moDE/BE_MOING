@@ -75,6 +75,8 @@ public class ReviewService {
                 .build();
 
         return placeRepository.save(newPlace).getId();
+    }
+
     // 현재 리뷰 목록 (72h 이내, 커서 기반)
     @Transactional(readOnly = true)
     public ReviewListResponse getCurrentReviews(Long placeId, Long userId, Long cursor, int limit) {

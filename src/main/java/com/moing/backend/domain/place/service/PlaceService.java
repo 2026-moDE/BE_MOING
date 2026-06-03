@@ -53,13 +53,15 @@ public class PlaceService {
      * @param query     네이버 검색어 (예: "카페", "맛집")
      */
     // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭_
-    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, int radius, String query) {
+    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
-        // query 없으면 DB에서 반경 내 장소(리뷰 있는 버블)만 반환
+        // query 없으면 DB에서 장소(리뷰 있는 버블)만 반환 (radius 없으면 전체 조회)
         if (query == null || query.isBlank()) {
-            List<PlaceNearbyResponse.PlaceItem> items = placeRepository.findNearby(latitude, longitude, radius, since)
-                    .stream()
+            List<Place> places = (radius == null)
+                    ? placeRepository.findAllWithRecentReviews(since)
+                    : placeRepository.findNearby(latitude, longitude, radius, since);
+            List<PlaceNearbyResponse.PlaceItem> items = places.stream()
                     .map(place -> toItem(place, since))
                     .toList();
             return new PlaceNearbyResponse(items);

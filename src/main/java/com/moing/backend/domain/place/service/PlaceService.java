@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -56,7 +58,7 @@ public class PlaceService {
 
         // query 없으면 DB에서 반경 내 장소(리뷰 있는 버블)만 반환
         if (query == null || query.isBlank()) {
-            List<PlaceNearbyResponse.PlaceItem> items = placeRepository.findNearby(latitude, longitude, radius)
+            List<PlaceNearbyResponse.PlaceItem> items = placeRepository.findNearby(latitude, longitude, radius, since)
                     .stream()
                     .map(place -> toItem(place, since))
                     .toList();
@@ -115,7 +117,8 @@ public class PlaceService {
 
         // 대표 이미지 조회 (72시간 이내)
         var thumbnailUrl = reviewRepository
-                .findTopWithImageByPlaceId(place.getId(), since)
+                .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                .stream().findFirst()
                 .map(Review::getImageUrl)
                 .orElse(null);
 

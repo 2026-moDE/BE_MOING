@@ -65,16 +65,22 @@ public class ReviewService {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
-        Place newPlace = Place.builder()
-                .name(request.placeName())
-                .address(request.placeAddress())
-                .latitude(request.placeLatitude())
-                .longitude(request.placeLongitude())
-                .category(request.placeCategory())
-                .source("USER")
-                .build();
+        // 같은 이름의 장소가 이미 존재하면 재사용
+        return placeRepository.findByNameAndIsActiveTrue(request.placeName())
+                .map(Place::getId)
+                .orElseGet(() -> {
+                    Place newPlace = Place.builder()
+                            .name(request.placeName())
+                            .address(request.placeAddress())
+                            .latitude(request.placeLatitude())
+                            .longitude(request.placeLongitude())
+                            .category(request.placeCategory())
+                            .source("USER")
+                            .build();
+                    return placeRepository.save(newPlace).getId();
+                });
+    }
 
-        return placeRepository.save(newPlace).getId();
     // 현재 리뷰 목록 (72h 이내, 커서 기반)
     @Transactional(readOnly = true)
     public ReviewListResponse getCurrentReviews(Long placeId, Long userId, Long cursor, int limit) {

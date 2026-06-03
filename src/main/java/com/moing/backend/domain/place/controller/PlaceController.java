@@ -79,7 +79,7 @@ public class PlaceController {
     public ResponseEntity<PlaceNearbyResponse> getNearbyPlaces(
             @RequestParam double latitude,
             @RequestParam double longitude,
-            @RequestParam(defaultValue = "1500") int radius,
+            @RequestParam(required = false) Integer radius,
             @RequestParam(required = false) String query
     ) {
         return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query));

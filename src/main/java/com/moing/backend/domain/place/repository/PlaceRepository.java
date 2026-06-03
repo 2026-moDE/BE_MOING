@@ -14,6 +14,18 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
     /** 장소명으로 활성 장소를 조회한다 (네이버 검색 결과 매칭용) */
     Optional<Place> findByNameAndIsActiveTrue(String name);
 
+    /** 72h 이내 리뷰가 있는 전체 활성 장소를 조회한다 (radius 미지정 시 전체 조회용) */
+    @Query(value = """
+            SELECT * FROM places p
+            WHERE p.is_active = true
+              AND EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE r.place_id = p.id
+                  AND r.created_at > :since
+              )
+            """, nativeQuery = true)
+    List<Place> findAllWithRecentReviews(@Param("since") LocalDateTime since);
+
     /**
      * Haversine 공식으로 반경(미터) 내 활성 장소 중 72h 이내 리뷰가 있는 장소를 거리 오름차순으로 조회한다.
      * 6371000 = 지구 반지름(m)

@@ -1,6 +1,7 @@
 package com.moing.backend.domain.review.repository;
 
 import com.moing.backend.domain.review.entity.Review;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,11 +24,52 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.imageUrl IS NOT NULL
             ORDER BY r.helpfulCount DESC, r.createdAt DESC
             """)
-    Optional<Review> findTopWithImageByPlaceId(
+    List<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
-            @Param("since") LocalDateTime since);
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
+
+    // 72h 이내 리뷰 수 (상세 조회용)
+    long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);
+
+    // 72h 이내 커서 기반 조회 (현재 리뷰)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt > :since
+              AND (:cursor IS NULL OR r.id < :cursor)
+            ORDER BY r.id DESC
+            """)
+    List<Review> findCurrentReviews(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            @Param("cursor") Long cursor,
+            Pageable pageable);
+
+    // 72h 경과 커서 기반 조회 (과거 리뷰)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt <= :since
+              AND (:cursor IS NULL OR r.id < :cursor)
+            ORDER BY r.id DESC
+            """)
+    List<Review> findArchivedReviews(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            @Param("cursor") Long cursor,
+            Pageable pageable);
 
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);
+
+    // 혼잡도 캐시 배치용: 최근 N시간 ACTIVE 리뷰 전체 (placeId 순, 최신 순)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.createdAt > :since
+              AND r.status = 'ACTIVE'
+            ORDER BY r.placeId ASC, r.createdAt DESC
+            """)
+    List<Review> findAllRecentActiveReviews(@Param("since") LocalDateTime since);
 }

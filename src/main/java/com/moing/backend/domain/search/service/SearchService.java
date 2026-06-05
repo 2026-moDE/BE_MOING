@@ -128,6 +128,8 @@ public class SearchService {
         String address = naverItem.roadAddress() != null && !naverItem.roadAddress().isBlank()
                 ? naverItem.roadAddress() : naverItem.address();
         PlaceCategory category = PlaceCategory.fromNaverCategory(naverItem.category());
+        double lat = Double.parseDouble(naverItem.mapy()) / 10_000_000.0;
+        double lng = Double.parseDouble(naverItem.mapx()) / 10_000_000.0;
 
         // DB에 있으면 혼잡도·썸네일 포함, 없으면 upsert 후 반환
         Optional<Place> existing = placeRepository.findByNameAndIsActiveTrue(name);
@@ -167,6 +169,8 @@ public class SearchService {
                 place.getName(),
                 place.getAddress(),
                 place.getCategory(),
+                place.getLatitude().doubleValue(),
+                place.getLongitude().doubleValue(),
                 congestionLevel,
                 thumbnailUrl
         );

@@ -125,11 +125,13 @@ public class SearchService {
         String name = naverItem.cleanTitle();
         String address = naverItem.roadAddress() != null ? naverItem.roadAddress() : naverItem.address();
         PlaceCategory category = PlaceCategory.fromNaverCategory(naverItem.category());
+        double lat = Double.parseDouble(naverItem.mapy()) / 10_000_000.0;
+        double lng = Double.parseDouble(naverItem.mapx()) / 10_000_000.0;
 
         // DB에 있는 장소면 혼잡도·썸네일 포함, 없으면 네이버 정보만 반환
         return placeRepository.findByNameAndIsActiveTrue(name)
                 .map(place -> toSearchItem(place, since))
-                .orElse(new PlaceSearchResponse.PlaceItem(null, name, address, category, null, null));
+                .orElse(new PlaceSearchResponse.PlaceItem(null, name, address, category, lat, lng, null, null));
     }
 
     private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {
@@ -148,6 +150,8 @@ public class SearchService {
                 place.getName(),
                 place.getAddress(),
                 place.getCategory(),
+                place.getLatitude().doubleValue(),
+                place.getLongitude().doubleValue(),
                 congestionLevel,
                 thumbnailUrl
         );

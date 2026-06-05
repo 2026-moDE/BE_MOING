@@ -63,4 +63,13 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);
+
+    // 혼잡도 캐시 배치용: 최근 N시간 ACTIVE 리뷰 전체 (placeId 순, 최신 순)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.createdAt > :since
+              AND r.status = 'ACTIVE'
+            ORDER BY r.placeId ASC, r.createdAt DESC
+            """)
+    List<Review> findAllRecentActiveReviews(@Param("since") LocalDateTime since);
 }

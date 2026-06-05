@@ -7,7 +7,6 @@ import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.place.service.NaverSearchService;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
-import org.springframework.data.domain.PageRequest;
 import com.moing.backend.domain.search.dto.AutocompleteResponse;
 import com.moing.backend.domain.search.dto.PlaceSearchResponse;
 import com.moing.backend.domain.search.dto.SearchHistoryResponse;
@@ -149,7 +148,7 @@ public class SearchService {
                 .source("NAVER")
                 .build());
 
-        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, null, null);
+        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null);
     }
 
     private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {

@@ -27,6 +27,9 @@ naver:
   api-key-id: ${NAVER_API_KEY_ID:}
   api-key: ${NAVER_API_KEY:}
 
+seoul:
+  city-data-api-key: ${SEOUL_CITY_DATA_API_KEY:}
+
 aws:
   s3:
     access-key: ${AWS_ACCESS_KEY}

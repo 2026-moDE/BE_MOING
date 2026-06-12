@@ -14,7 +14,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
     /** 장소명으로 활성 장소를 조회한다 (네이버 검색 결과 매칭용) */
     Optional<Place> findByNameAndIsActiveTrue(String name);
 
-    /** 72h 이내 리뷰가 있는 전체 활성 장소를 조회한다 (radius 미지정 시 전체 조회용) */
+    /** 전체 활성 장소를 조회한다 */
+    List<Place> findAllByIsActiveTrue();
+
+    /** 72h 이내 리뷰가 있는 전체 활성 장소를 조회한다 */
     @Query(value = """
             SELECT * FROM places p
             WHERE p.is_active = true
@@ -26,13 +29,50 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             """, nativeQuery = true)
     List<Place> findAllWithRecentReviews(@Param("since") LocalDateTime since);
 
-    /**
-     * Haversine 공식으로 반경(미터) 내 활성 장소 중 72h 이내 리뷰가 있는 장소를 거리 오름차순으로 조회한다.
-     * 6371000 = 지구 반지름(m)
-     */
+    /** 72h 이전 리뷰만 있는 전체 활성 장소를 조회한다 */
     @Query(value = """
-            SELECT *
-            FROM places p
+            SELECT * FROM places p
+            WHERE p.is_active = true
+              AND EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE r.place_id = p.id
+                  AND r.created_at <= :since
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE r.place_id = p.id
+                  AND r.created_at > :since
+              )
+            """, nativeQuery = true)
+    List<Place> findAllWithArchivedReviews(@Param("since") LocalDateTime since);
+
+    /** 반경 내 전체 활성 장소 (거리 오름차순) */
+    @Query(value = """
+            SELECT * FROM places p
+            WHERE p.is_active = true
+              AND (6371000 * acos(
+                    GREATEST(-1.0, LEAST(1.0,
+                      cos(radians(:lat)) * cos(radians(p.latitude))
+                      * cos(radians(p.longitude) - radians(:lng))
+                      + sin(radians(:lat)) * sin(radians(p.latitude))
+                    ))
+                  )) <= :radius
+            ORDER BY (6371000 * acos(
+                    GREATEST(-1.0, LEAST(1.0,
+                      cos(radians(:lat)) * cos(radians(p.latitude))
+                      * cos(radians(p.longitude) - radians(:lng))
+                      + sin(radians(:lat)) * sin(radians(p.latitude))
+                    ))
+                  )) ASC
+            """, nativeQuery = true)
+    List<Place> findNearbyAll(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radius") int radius);
+
+    /** 반경 내 72h 이내 리뷰가 있는 활성 장소 (거리 오름차순) */
+    @Query(value = """
+            SELECT * FROM places p
             WHERE p.is_active = true
               AND EXISTS (
                 SELECT 1 FROM reviews r
@@ -55,6 +95,41 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
                   )) ASC
             """, nativeQuery = true)
     List<Place> findNearby(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("radius") int radius,
+            @Param("since") LocalDateTime since);
+
+    /** 반경 내 72h 이전 리뷰만 있는 활성 장소 (거리 오름차순) */
+    @Query(value = """
+            SELECT * FROM places p
+            WHERE p.is_active = true
+              AND EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE r.place_id = p.id
+                  AND r.created_at <= :since
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE r.place_id = p.id
+                  AND r.created_at > :since
+              )
+              AND (6371000 * acos(
+                    GREATEST(-1.0, LEAST(1.0,
+                      cos(radians(:lat)) * cos(radians(p.latitude))
+                      * cos(radians(p.longitude) - radians(:lng))
+                      + sin(radians(:lat)) * sin(radians(p.latitude))
+                    ))
+                  )) <= :radius
+            ORDER BY (6371000 * acos(
+                    GREATEST(-1.0, LEAST(1.0,
+                      cos(radians(:lat)) * cos(radians(p.latitude))
+                      * cos(radians(p.longitude) - radians(:lng))
+                      + sin(radians(:lat)) * sin(radians(p.latitude))
+                    ))
+                  )) ASC
+            """, nativeQuery = true)
+    List<Place> findNearbyWithArchivedReviews(
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radius") int radius,

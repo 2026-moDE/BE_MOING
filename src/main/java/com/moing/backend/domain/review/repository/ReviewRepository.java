@@ -29,6 +29,30 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("since") LocalDateTime since,
             Pageable pageable);
 
+    // 시간 제한 없이 helpful_count 가장 높은 리뷰 (대표 사진, 전체 필터용)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.imageUrl IS NOT NULL
+            ORDER BY r.helpfulCount DESC, r.createdAt DESC
+            """)
+    List<Review> findTopWithImageAllTimeByPlaceId(
+            @Param("placeId") Long placeId,
+            Pageable pageable);
+
+    // 72h 이전 리뷰 중 helpful_count 가장 높은 리뷰 (대표 사진, 과거 필터용)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt <= :since
+              AND r.imageUrl IS NOT NULL
+            ORDER BY r.helpfulCount DESC, r.createdAt DESC
+            """)
+    List<Review> findTopWithArchivedImageByPlaceId(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
+
     // 72h 이내 리뷰 수 (상세 조회용)
     long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);
 
@@ -59,6 +83,14 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("since") LocalDateTime since,
             @Param("cursor") Long cursor,
             Pageable pageable);
+
+    // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 수 조회
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
+    long countByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
+
+    // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 목록 조회
+    @Query("SELECT r FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
+    List<Review> findByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
 
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")

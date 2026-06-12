@@ -2,6 +2,7 @@ package com.moing.backend.domain.place.entity;
 
 public enum PlaceCategory {
     RESTAURANT("음식점"),
+    FOOD("음식점"),
     CAFE("카페"),
     POPUP("팝업스토어"),
     PERFORMANCE("공연장"),

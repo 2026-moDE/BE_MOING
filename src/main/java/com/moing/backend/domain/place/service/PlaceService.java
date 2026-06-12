@@ -4,6 +4,8 @@ import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.NaverLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.entity.PlaceCongestionCache;
+import com.moing.backend.domain.place.repository.PlaceCongestionCacheRepository;
 import com.moing.backend.domain.place.repository.PlaceSubscriptionRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -17,10 +19,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 장소 서비스
@@ -33,6 +39,7 @@ public class PlaceService {
 
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
+    private final PlaceCongestionCacheRepository congestionCacheRepository;
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
     private final NaverSearchService naverSearchService;
 
@@ -51,15 +58,27 @@ public class PlaceService {
      * @param query     네이버 검색어 (예: "카페", "맛집")
      */
     // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭_
-    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, int radius, String query) {
+    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query) {
+        LocalDateTime since = LocalDateTime.now().minusHours(72);
+
+        // query 없으면 DB에서 장소(리뷰 있는 버블)만 반환 (radius 없으면 전체 조회)
+        if (query == null || query.isBlank()) {
+            List<Place> places = (radius == null)
+                    ? placeRepository.findAllWithRecentReviews(since)
+                    : placeRepository.findNearby(latitude, longitude, radius, since);
+
+            Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
+            List<PlaceNearbyResponse.PlaceItem> items = places.stream()
+                    .map(place -> toItem(place, since, cacheMap.get(place.getId())))
+                    .toList();
+            return new PlaceNearbyResponse(items);
+        }
+
         NaverLocalResponse naverResult = naverSearchService.search(query);
 
         if (naverResult == null || naverResult.items() == null) {
             return new PlaceNearbyResponse(List.of());
         }
-
-        // 최근 72시간 이내 데이터 추출 기준 시간
-        LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceNearbyResponse.PlaceItem> items = naverResult.items().stream()
                 .map(item -> buildPlaceItem(item, latitude, longitude, radius, since))
@@ -90,24 +109,32 @@ public class PlaceService {
 
         // DB에 존재하면 상세 정보 포함해서 반환
         if (dbPlace.isPresent()) {
-            return toItem(dbPlace.get(), since);
+            Place place = dbPlace.get();
+            PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
+            return toItem(place, since, cache);
         }
 
         // DB에 없으면 네이버 정보만 반환
-        return new PlaceNearbyResponse.PlaceItem(null, name, itemLat, itemLng, null, null);
+        return new PlaceNearbyResponse.PlaceItem(null, name, itemLat, itemLng, null, null, null, null);
+    }
+
+    // placeId 목록으로 혼잡도 캐시를 한 번에 로드
+    private Map<Long, PlaceCongestionCache> loadCacheMap(List<Place> places) {
+        List<Long> ids = places.stream().map(Place::getId).toList();
+        return congestionCacheRepository.findAllById(ids)
+                .stream()
+                .collect(Collectors.toMap(PlaceCongestionCache::getPlaceId, c -> c));
     }
 
     // DB 엔티티를 응답 DTO로 변환
-    private PlaceNearbyResponse.PlaceItem toItem(Place place, LocalDateTime since) {
-        // 최신 혼잡도 레벨 조회 (72시간 이내)
-        var congestionLevel = reviewRepository
-                .findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(place.getId(), since)
-                .map(Review::getCongestionLevel)
-                .orElse(null);
+    private PlaceNearbyResponse.PlaceItem toItem(Place place, LocalDateTime since, PlaceCongestionCache cache) {
+        // 혼잡도: 캐시에서 조회
+        CongestionLevel congestionLevel = cache != null ? cache.getCongestionLevel() : null;
 
         // 대표 이미지 조회 (72시간 이내)
         var thumbnailUrl = reviewRepository
-                .findTopWithImageByPlaceId(place.getId(), since)
+                .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                .stream().findFirst()
                 .map(Review::getImageUrl)
                 .orElse(null);
 
@@ -117,7 +144,9 @@ public class PlaceService {
                 place.getLatitude().doubleValue(),
                 place.getLongitude().doubleValue(),
                 congestionLevel,
-                thumbnailUrl
+                thumbnailUrl,
+                place.getCategory(),
+                place.getAddress()
         );
     }
 
@@ -133,10 +162,7 @@ public class PlaceService {
 
         boolean isSubscribed = placeSubscriptionRepository.existsByUserIdAndPlaceId(userId, placeId);
 
-        CongestionLevel congestionLevel = reviewRepository
-                .findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(placeId, since)
-                .map(Review::getCongestionLevel)
-                .orElse(null);
+        PlaceCongestionCache cache = congestionCacheRepository.findById(placeId).orElse(null);
 
         long reviewCount = reviewRepository.countByPlaceIdAndCreatedAtAfter(placeId, since);
 
@@ -147,7 +173,10 @@ public class PlaceService {
                 place.getCategory(),
                 place.getBusinessHours(),
                 isSubscribed,
-                congestionLevel,
+                cache != null ? cache.getCongestionLevel() : null,
+                cache != null ? cache.getCongestionIndex() : null,
+                cache != null ? cache.getReviewCount() : 0,
+                cache != null ? cache.getUpdatedAt() : null,
                 reviewCount
         );
     }

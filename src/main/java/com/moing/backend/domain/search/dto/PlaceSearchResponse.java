@@ -13,6 +13,8 @@ public record PlaceSearchResponse(List<PlaceItem> places) {
             String name,
             String address,
             PlaceCategory category,
+            double latitude,
+            double longitude,
             @JsonProperty("congestion_level") CongestionLevel congestionLevel,
             @JsonProperty("thumbnail_url") String thumbnailUrl
     ) {}

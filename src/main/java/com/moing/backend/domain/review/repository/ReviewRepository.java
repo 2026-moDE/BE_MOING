@@ -24,9 +24,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.imageUrl IS NOT NULL
             ORDER BY r.helpfulCount DESC, r.createdAt DESC
             """)
-    Optional<Review> findTopWithImageByPlaceId(
+    List<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
-            @Param("since") LocalDateTime since);
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
 
     // 72h 이내 리뷰 수 (상세 조회용)
     long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);
@@ -70,4 +71,13 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);
+
+    // 혼잡도 캐시 배치용: 최근 N시간 ACTIVE 리뷰 전체 (placeId 순, 최신 순)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.createdAt > :since
+              AND r.status = 'ACTIVE'
+            ORDER BY r.placeId ASC, r.createdAt DESC
+            """)
+    List<Review> findAllRecentActiveReviews(@Param("since") LocalDateTime since);
 }

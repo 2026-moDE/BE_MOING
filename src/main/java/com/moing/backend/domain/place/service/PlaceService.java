@@ -57,19 +57,16 @@ public class PlaceService {
      * @param radius    검색 반경 (m)
      * @param query     네이버 검색어 (예: "카페", "맛집")
      */
-    // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭_
-    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query) {
+    // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭)
+    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query, String filter) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
-        // query 없으면 DB에서 장소(리뷰 있는 버블)만 반환 (radius 없으면 전체 조회)
+        // query 없으면 DB에서 장소 버블 반환 (filter에 따라 분기)
         if (query == null || query.isBlank()) {
-            List<Place> places = (radius == null)
-                    ? placeRepository.findAllWithRecentReviews(since)
-                    : placeRepository.findNearby(latitude, longitude, radius, since);
-
+            List<Place> places = resolvePlaces(filter, latitude, longitude, radius, since);
             Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
             List<PlaceNearbyResponse.PlaceItem> items = places.stream()
-                    .map(place -> toItem(place, since, cacheMap.get(place.getId())))
+                    .map(place -> toItem(place, filter, since, cacheMap.get(place.getId())))
                     .toList();
             return new PlaceNearbyResponse(items);
         }
@@ -86,6 +83,21 @@ public class PlaceService {
                 .toList();
 
         return new PlaceNearbyResponse(items);
+    }
+
+    // filter 값에 따라 장소 목록 조회
+    private List<Place> resolvePlaces(String filter, double latitude, double longitude, Integer radius, LocalDateTime since) {
+        return switch (filter) {
+            case "current" -> (radius == null)
+                    ? placeRepository.findAllWithRecentReviews(since)
+                    : placeRepository.findNearby(latitude, longitude, radius, since);
+            case "archived" -> (radius == null)
+                    ? placeRepository.findAllWithArchivedReviews(since)
+                    : placeRepository.findNearbyWithArchivedReviews(latitude, longitude, radius, since);
+            default -> (radius == null)  // "all"
+                    ? placeRepository.findAllByIsActiveTrue()
+                    : placeRepository.findNearbyAll(latitude, longitude, radius);
+        };
     }
 
     // Naver 검색 결과 아이템을 PlaceItem DTO로 변환
@@ -111,7 +123,7 @@ public class PlaceService {
         if (dbPlace.isPresent()) {
             Place place = dbPlace.get();
             PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
-            return toItem(place, since, cache);
+            return toItem(place, "current", since, cache);
         }
 
         // DB에 없으면 네이버 정보만 반환
@@ -126,17 +138,21 @@ public class PlaceService {
                 .collect(Collectors.toMap(PlaceCongestionCache::getPlaceId, c -> c));
     }
 
-    // DB 엔티티를 응답 DTO로 변환
-    private PlaceNearbyResponse.PlaceItem toItem(Place place, LocalDateTime since, PlaceCongestionCache cache) {
-        // 혼잡도: 캐시에서 조회
+    // DB 엔티티를 응답 DTO로 변환 (filter에 따라 썸네일 조회 범위 결정)
+    private PlaceNearbyResponse.PlaceItem toItem(Place place, String filter, LocalDateTime since, PlaceCongestionCache cache) {
         CongestionLevel congestionLevel = cache != null ? cache.getCongestionLevel() : null;
 
-        // 대표 이미지 조회 (72시간 이내)
-        var thumbnailUrl = reviewRepository
-                .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
-                .stream().findFirst()
-                .map(Review::getImageUrl)
-                .orElse(null);
+        var thumbnailUrl = switch (filter) {
+            case "current" -> reviewRepository
+                    .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+            case "archived" -> reviewRepository
+                    .findTopWithArchivedImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+            default -> reviewRepository  // "all"
+                    .findTopWithImageAllTimeByPlaceId(place.getId(), PageRequest.of(0, 1))
+                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+        };
 
         return new PlaceNearbyResponse.PlaceItem(
                 place.getId(),

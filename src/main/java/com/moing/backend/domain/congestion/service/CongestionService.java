@@ -69,7 +69,7 @@ public class CongestionService {
 
     private CongestionResponse.AreaItem buildAreaItem(SeoulArea area, LocalDateTime since) {
         // 지역 근처 장소들의 72h 리뷰 집계
-        List<Place> nearbyPlaces = placeRepository.findNearby(area.latitude(), area.longitude(), PLACE_SEARCH_RADIUS);
+        List<Place> nearbyPlaces = placeRepository.findNearbyAll(area.latitude(), area.longitude(), PLACE_SEARCH_RADIUS);
         List<Long> placeIds = nearbyPlaces.stream().map(Place::getId).toList();
 
         if (!placeIds.isEmpty()) {

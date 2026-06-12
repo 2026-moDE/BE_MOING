@@ -67,6 +67,7 @@ public class PlaceService {
             Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
             List<PlaceNearbyResponse.PlaceItem> items = places.stream()
                     .map(place -> toItem(place, filter, since, cacheMap.get(place.getId())))
+                    .filter(item -> item.thumbnailUrl() != null)
                     .toList();
             return new PlaceNearbyResponse(items);
         }
@@ -103,15 +104,15 @@ public class PlaceService {
     // Naver 검색 결과 아이템을 PlaceItem DTO로 변환
     private PlaceNearbyResponse.PlaceItem buildPlaceItem(
             NaverLocalResponse.Item naverItem,
-            double userLat, double userLng, int radius,
+            double userLat, double userLng, Integer radius,
             LocalDateTime since) {
 
         // 1. 네이버 좌표(10^7) -> WGS84 위경도로 직접 변환
         double itemLng = Double.parseDouble(naverItem.mapx()) / 10_000_000.0;
         double itemLat = Double.parseDouble(naverItem.mapy()) / 10_000_000.0;
 
-        // 2. 반경 내 장소만 포함
-        if (!isWithinRadius(userLat, userLng, itemLat, itemLng, radius)) {
+        // 2. 반경 지정 시에만 필터링
+        if (radius != null && !isWithinRadius(userLat, userLng, itemLat, itemLng, radius)) {
             return null;
         }
 

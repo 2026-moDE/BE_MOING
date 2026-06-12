@@ -74,14 +74,15 @@ public class PlaceController {
                 placeService.verifyLocation(id, latitude, longitude)));
     }
 
-    // 장소 검색
+    // 장소 검색 (filter: all | current | archived, 기본값 all)
     @GetMapping("/nearby")
     public ResponseEntity<PlaceNearbyResponse> getNearbyPlaces(
             @RequestParam double latitude,
             @RequestParam double longitude,
             @RequestParam(required = false) Integer radius,
-            @RequestParam(required = false) String query
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "all") String filter
     ) {
-        return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query));
+        return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query, filter));
     }
 }

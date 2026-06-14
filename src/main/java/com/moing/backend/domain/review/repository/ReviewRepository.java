@@ -104,4 +104,17 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             ORDER BY r.placeId ASC, r.createdAt DESC
             """)
     List<Review> findAllRecentActiveReviews(@Param("since") LocalDateTime since);
+
+    // 단일 장소 즉시 캐시 갱신용: 최근 N시간 ACTIVE 리뷰 (최신 순)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt > :since
+              AND r.status = 'ACTIVE'
+            ORDER BY r.createdAt DESC
+            """)
+    List<Review> findRecentActiveReviewsByPlaceId(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
 }

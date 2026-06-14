@@ -2,6 +2,7 @@ package com.moing.backend.domain.review.service;
 
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
+import com.moing.backend.domain.place.service.CongestionCacheService;
 import com.moing.backend.domain.review.dto.ReviewCreateRequest;
 import com.moing.backend.domain.review.dto.ReviewCreateResponse;
 import com.moing.backend.domain.review.dto.ReviewListResponse;
@@ -31,6 +32,7 @@ public class ReviewService {
     private final ReviewHelpfulRepository reviewHelpfulRepository;
     private final PlaceRepository placeRepository;
     private final UserRepository userRepository;
+    private final CongestionCacheService congestionCacheService;
 
     // 리뷰 작성
     @Transactional
@@ -48,7 +50,9 @@ public class ReviewService {
                 .longitude(request.longitude())
                 .build();
 
-        return ReviewCreateResponse.from(reviewRepository.save(review));
+        ReviewCreateResponse response = ReviewCreateResponse.from(reviewRepository.save(review));
+        congestionCacheService.refreshForPlace(placeId);
+        return response;
     }
 
     // placeId가 있으면 존재 확인, 없으면 새 장소 생성 후 id 반환

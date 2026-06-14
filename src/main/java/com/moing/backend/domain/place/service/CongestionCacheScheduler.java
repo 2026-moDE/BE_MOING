@@ -2,7 +2,6 @@ package com.moing.backend.domain.place.service;
 
 import com.moing.backend.domain.place.entity.PlaceCongestionCache;
 import com.moing.backend.domain.place.repository.PlaceCongestionCacheRepository;
-import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,16 +32,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CongestionCacheScheduler {
 
-    private static final int WINDOW_HOURS = 3;
-    private static final int MAX_REVIEWS = 50;
-
     private final ReviewRepository reviewRepository;
     private final PlaceCongestionCacheRepository congestionCacheRepository;
+    private final CongestionCacheService congestionCacheService;
 
     @Scheduled(fixedDelay = 5 * 60 * 1000) // 5분
     @Transactional
     public void refreshCongestionCache() {
-        LocalDateTime since = LocalDateTime.now().minusHours(WINDOW_HOURS);
+        LocalDateTime since = LocalDateTime.now().minusHours(CongestionCacheService.WINDOW_HOURS);
 
         // 최근 3시간 ACTIVE 리뷰 전체 조회
         List<Review> allReviews = reviewRepository.findAllRecentActiveReviews(since);
@@ -59,11 +55,11 @@ public class CongestionCacheScheduler {
                     Long placeId = entry.getKey();
                     List<Review> reviews = entry.getValue().stream()
                             .sorted(Comparator.comparing(Review::getCreatedAt).reversed())
-                            .limit(MAX_REVIEWS)
+                            .limit(CongestionCacheService.MAX_REVIEWS)
                             .toList();
 
-                    double index = calculateWeightedAverage(reviews, now);
-                    return new PlaceCongestionCache(placeId, toCongestionLevel(index), index, reviews.size(), now);
+                    double index = congestionCacheService.calculateWeightedAverage(reviews, now);
+                    return new PlaceCongestionCache(placeId, congestionCacheService.toCongestionLevel(index), index, reviews.size(), now);
                 })
                 .toList();
 
@@ -82,34 +78,5 @@ public class CongestionCacheScheduler {
         }
 
         log.info("[CongestionCache] {}개 장소 갱신 완료", caches.size());
-    }
-
-    /** w = 1 / (경과분 + 1) 가중 평균 */
-    private double calculateWeightedAverage(List<Review> reviews, LocalDateTime now) {
-        double weightedSum = 0;
-        double weightSum = 0;
-
-        for (Review review : reviews) {
-            long elapsedMinutes = ChronoUnit.MINUTES.between(review.getCreatedAt(), now);
-            double weight = 1.0 / (elapsedMinutes + 1);
-            weightedSum += toScore(review.getCongestionLevel()) * weight;
-            weightSum += weight;
-        }
-
-        return weightSum == 0 ? 0 : weightedSum / weightSum;
-    }
-
-    private int toScore(CongestionLevel level) {
-        return switch (level) {
-            case LOW -> 1;
-            case MEDIUM -> 2;
-            case HIGH -> 3;
-        };
-    }
-
-    private CongestionLevel toCongestionLevel(double index) {
-        if (index <= 1.6) return CongestionLevel.LOW;
-        if (index <= 2.3) return CongestionLevel.MEDIUM;
-        return CongestionLevel.HIGH;
     }
 }

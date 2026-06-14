@@ -7,6 +7,7 @@ import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.place.service.NaverSearchService;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
+import org.springframework.data.domain.PageRequest;
 import com.moing.backend.domain.search.dto.AutocompleteResponse;
 import com.moing.backend.domain.search.dto.PlaceSearchResponse;
 import com.moing.backend.domain.search.dto.SearchHistoryResponse;
@@ -156,7 +157,8 @@ public class SearchService {
                 .orElse(null);
 
         var thumbnailUrl = reviewRepository
-                .findTopWithImageByPlaceId(place.getId(), since)
+                .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                .stream().findFirst()
                 .map(Review::getImageUrl)
                 .orElse(null);
 

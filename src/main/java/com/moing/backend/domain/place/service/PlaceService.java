@@ -4,6 +4,8 @@ import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.NaverLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.dto.SubscribeResponse;
+import com.moing.backend.domain.place.entity.PlaceSubscription;
 import com.moing.backend.domain.place.entity.PlaceCongestionCache;
 import com.moing.backend.domain.place.repository.PlaceCongestionCacheRepository;
 import com.moing.backend.domain.place.repository.PlaceSubscriptionRepository;
@@ -230,5 +232,36 @@ public class PlaceService {
     private boolean isWithinRadius(double userLat, double userLng,
                                    double itemLat, double itemLng, int radius) {
         return calculateDistance(userLat, userLng, itemLat, itemLng) <= radius;
+    }
+
+    @Transactional
+    public SubscribeResponse subscribe(Long userId, Long placeId) {
+        placeRepository.findById(placeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (placeSubscriptionRepository.existsByUserIdAndPlaceId(userId, placeId)) {
+            throw new CustomException(ErrorCode.DUPLICATE);
+        }
+
+        placeSubscriptionRepository.save(PlaceSubscription.builder()
+                .userId(userId)
+                .placeId(placeId)
+                .build());
+
+        return new SubscribeResponse(true);
+    }
+
+    @Transactional
+    public SubscribeResponse unsubscribe(Long userId, Long placeId) {
+        placeRepository.findById(placeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (!placeSubscriptionRepository.existsByUserIdAndPlaceId(userId, placeId)) {
+            throw new CustomException(ErrorCode.NOT_FOUND);
+        }
+
+        placeSubscriptionRepository.deleteByUserIdAndPlaceId(userId, placeId);
+
+        return new SubscribeResponse(false);
     }
 }

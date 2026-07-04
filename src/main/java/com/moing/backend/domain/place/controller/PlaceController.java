@@ -3,6 +3,7 @@ package com.moing.backend.domain.place.controller;
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.dto.SubscribeResponse;
 import com.moing.backend.domain.place.service.PlaceService;
 import com.moing.backend.domain.review.dto.ReviewListResponse;
 import com.moing.backend.domain.review.service.ReviewService;
@@ -12,11 +13,7 @@ import com.moing.backend.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/places")
@@ -84,5 +81,23 @@ public class PlaceController {
             @RequestParam(defaultValue = "all") String filter
     ) {
         return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query, filter));
+    }
+
+    @PostMapping("/{id}/subscribe")
+    public ResponseEntity<ApiResponse<SubscribeResponse>> subscribe(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                placeService.subscribe(userId, id)));
+    }
+
+    @DeleteMapping("/{id}/subscribe")
+    public ResponseEntity<ApiResponse<SubscribeResponse>> unsubscribe(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                placeService.unsubscribe(userId, id)));
     }
 }

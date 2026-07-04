@@ -92,6 +92,13 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT r FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
     List<Review> findByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
 
+    // 마이페이지: 사용자 리뷰 수
+    long countByUserId(Long userId);
+
+    // 마이페이지: 사용자가 리뷰한 distinct 장소 수
+    @Query("SELECT COUNT(DISTINCT r.placeId) FROM Review r WHERE r.userId = :userId")
+    long countDistinctPlaceIdByUserId(@Param("userId") Long userId);
+
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);
@@ -116,5 +123,21 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findRecentActiveReviewsByPlaceId(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since,
+            Pageable pageable);
+
+    // 마이페이지: 내 리뷰 커서 기반 조회 (year/month 필터 포함)
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.userId = :userId
+              AND (:cursor IS NULL OR r.id < :cursor)
+              AND (:year IS NULL OR :month IS NULL
+                   OR (YEAR(r.createdAt) = :year AND MONTH(r.createdAt) = :month))
+            ORDER BY r.id DESC
+            """)
+    List<Review> findMyReviews(
+            @Param("userId") Long userId,
+            @Param("cursor") Long cursor,
+            @Param("year") Integer year,
+            @Param("month") Integer month,
             Pageable pageable);
 }

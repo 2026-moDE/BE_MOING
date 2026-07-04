@@ -10,4 +10,6 @@ public interface PlaceSubscriptionRepository extends JpaRepository<PlaceSubscrip
     long countByUserId(Long userId);
 
     java.util.List<PlaceSubscription> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    void deleteByUserIdAndPlaceId(Long userId, Long placeId);
 }

@@ -37,6 +37,9 @@ aws:
     region: ap-northeast-2
     bucket: moing-reviews
 
+firebase:
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

@@ -23,6 +23,7 @@ public record ReviewListResponse(
             String comment,
             @JsonProperty("helpful_count") int helpfulCount,
             @JsonProperty("is_helpful") Boolean isHelpful,
+            @JsonProperty("is_mine") boolean isMine,
             UserInfo user,
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
             @JsonProperty("created_at") LocalDateTime createdAt

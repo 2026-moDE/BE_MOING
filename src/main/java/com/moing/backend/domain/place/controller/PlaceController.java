@@ -53,7 +53,7 @@ public class PlaceController {
             @RequestParam(defaultValue = "10") int limit
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                reviewService.getArchivedReviews(id, cursor, limit)));
+                reviewService.getArchivedReviews(id, userId, cursor, limit)));
     }
 
     // 위치 인증 확인

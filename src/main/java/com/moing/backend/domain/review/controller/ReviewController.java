@@ -9,10 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -20,6 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewController {
 
     private final ReviewService reviewService;
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteReview(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        reviewService.deleteReview(userId, id);
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<ReviewCreateResponse>> createReview(

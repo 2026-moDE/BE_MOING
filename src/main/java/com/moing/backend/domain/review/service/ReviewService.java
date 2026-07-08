@@ -158,7 +158,7 @@ public class ReviewService {
 
     // 과거 리뷰 목록 (72h 경과, 커서 기반)
     @Transactional(readOnly = true)
-    public ReviewListResponse getArchivedReviews(Long placeId, Long cursor, int limit) {
+    public ReviewListResponse getArchivedReviews(Long placeId, Long userId, Long cursor, int limit) {
         if (!placeRepository.existsById(placeId)) {
             throw new CustomException(ErrorCode.NOT_FOUND);
         }
@@ -167,7 +167,7 @@ public class ReviewService {
         List<Review> reviews = reviewRepository.findArchivedReviews(
                 placeId, since, cursor, PageRequest.of(0, limit + 1));
 
-        return buildResponse(reviews, limit, null, false);
+        return buildResponse(reviews, limit, userId, false);
     }
 
     private ReviewListResponse buildResponse(List<Review> reviews, int limit, Long userId, boolean includeIsHelpful) {
@@ -192,9 +192,10 @@ public class ReviewService {
                             ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl())
                             : new ReviewListResponse.UserInfo("알 수 없음", null);
                     Boolean isHelpful = includeIsHelpful ? finalHelpfulIds.contains(r.getId()) : null;
+                    boolean isMine = userId != null && userId.equals(r.getUserId());
                     return new ReviewListResponse.ReviewItem(
                             r.getId(), r.getImageUrl(), r.getCongestionLevel(),
-                            r.getComment(), r.getHelpfulCount(), isHelpful,
+                            r.getComment(), r.getHelpfulCount(), isHelpful, isMine,
                             userInfo, r.getCreatedAt()
                     );
                 })

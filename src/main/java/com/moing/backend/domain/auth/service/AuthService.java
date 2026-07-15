@@ -108,5 +108,9 @@ public class AuthService {
                 request.privacyAgreed(),
                 request.marketingAgreed()
         );
+
+        if (request.profileImageUrl() != null) {
+            user.updateProfileImageUrl(request.profileImageUrl());
+        }
     }
 }

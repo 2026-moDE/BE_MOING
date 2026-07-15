@@ -99,6 +99,18 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT COUNT(DISTINCT r.placeId) FROM Review r WHERE r.userId = :userId")
     long countDistinctPlaceIdByUserId(@Param("userId") Long userId);
 
+    // 구독 목록 썸네일: 복수 장소의 72h 이내 가장 최근 이미지 URL
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId IN :placeIds
+              AND r.createdAt > :since
+              AND r.imageUrl IS NOT NULL
+            ORDER BY r.createdAt DESC
+            """)
+    List<Review> findRecentReviewsWithImageByPlaceIds(
+            @Param("placeIds") List<Long> placeIds,
+            @Param("since") LocalDateTime since);
+
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);

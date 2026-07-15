@@ -106,4 +106,14 @@ public class User {
     public void updateProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
+
+    // 탈퇴 후 재가입 시 계정 복구 (deleted_at 초기화 및 약관 동의 초기화)
+    public void restore(String fcmToken) {
+        this.deletedAt = null;
+        this.fcmToken = fcmToken;
+        this.termsAgreed = false;
+        this.locationTermsAgreed = false;
+        this.privacyAgreed = false;
+        this.marketingAgreed = false;
+    }
 }

@@ -18,5 +18,6 @@ public class SocialLoginRequest {
     @NotBlank(message = "access_token은 필수입니다")
     private String accessToken;
 
+    @JsonProperty("fcm_token")
     private String fcmToken;
 }

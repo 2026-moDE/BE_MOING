@@ -202,7 +202,7 @@ public class PlaceService {
 
     /**
      * 위치 인증
-     * 사용자 좌표와 장소 좌표 간 거리를 계산하여 100m 이내면 인증 성공으로 반환한다.
+     * 사용자 좌표와 장소 좌표 간 거리를 계산하여 200m 이내면 인증 성공으로 반환한다.
      */
     public LocationVerifyResponse verifyLocation(Long placeId, double latitude, double longitude) {
         Place place = placeRepository.findById(placeId)
@@ -214,7 +214,7 @@ public class PlaceService {
                 place.getLongitude().doubleValue()
         );
 
-        return new LocationVerifyResponse(distance <= 100, distance);
+        return new LocationVerifyResponse(distance <= 200, distance);
     }
 
     // Haversine 공식으로 두 좌표 간 거리(m) 반환

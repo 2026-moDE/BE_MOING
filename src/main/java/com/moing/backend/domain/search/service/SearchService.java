@@ -1,10 +1,10 @@
 package com.moing.backend.domain.search.service;
 
-import com.moing.backend.domain.place.dto.NaverLocalResponse;
+import com.moing.backend.domain.place.dto.KakaoLocalResponse;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.place.repository.PlaceRepository;
-import com.moing.backend.domain.place.service.NaverSearchService;
+import com.moing.backend.domain.place.service.KakaoSearchService;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.search.dto.AutocompleteResponse;
@@ -31,7 +31,7 @@ public class SearchService {
 
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
-    private final NaverSearchService naverSearchService;
+    private final KakaoSearchService kakaoSearchService;
     private final SearchHistoryRepository searchHistoryRepository;
 
     /**
@@ -49,39 +49,22 @@ public class SearchService {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceSearchResponse.PlaceItem> items;
-//        if (keyword.startsWith("#")) {
-//            String tag = keyword.substring(1);
-//            List<Long> placeIds = reviewRepository.findPlaceIdsByQuickTag(tag);
-//            List<Place> places = placeIds.isEmpty() ? List.of() : placeRepository.findByIdInAndIsActiveTrue(placeIds);
-//            items = places.stream().map(place -> toSearchItem(place, since)).toList();
-//        } else {
-            NaverLocalResponse naverResult = naverSearchService.search(keyword);
-            if (naverResult == null || naverResult.items() == null) {
-                items = List.of();
-            } else {
-                items = naverResult.items().stream()
-                        .map(naverItem -> buildSearchItem(naverItem, since))
-                        .filter(item -> {
-                            if (latitude == null || longitude == null || radius == null) return true;
-                            int distance = calculateDistance(latitude, longitude, item.latitude(), item.longitude());
-                            return distance <= radius;
-                        })
-                        .toList();
-            }
-//        }
+        KakaoLocalResponse kakaoResult = kakaoSearchService.search(
+                keyword,
+                longitude != null ? longitude : null,
+                latitude != null ? latitude : null,
+                radius
+        );
+
+        if (kakaoResult == null || kakaoResult.documents() == null) {
+            items = List.of();
+        } else {
+            items = kakaoResult.documents().stream()
+                    .map(doc -> buildSearchItem(doc, since))
+                    .toList();
+        }
 
         return new PlaceSearchResponse(items);
-    }
-
-    // Haversine 공식으로 두 좌표 간 거리(m) 반환
-    private int calculateDistance(double lat1, double lng1, double lat2, double lng2) {
-        final int EARTH_RADIUS = 6_371_000;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return (int) Math.round(EARTH_RADIUS * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a)));
     }
 
     /**
@@ -89,19 +72,18 @@ public class SearchService {
      * 네이버 검색 결과에서 키워드로 시작하는 장소명 상위 10개를 반환한다.
      */
     public AutocompleteResponse autocomplete(String keyword) {
-        NaverLocalResponse naverResult = naverSearchService.search(keyword);
+        KakaoLocalResponse kakaoResult = kakaoSearchService.search(keyword, null, null, null);
 
-        if (naverResult == null || naverResult.items() == null) {
+        if (kakaoResult == null || kakaoResult.documents() == null) {
             return new AutocompleteResponse(List.of());
         }
 
-        List<AutocompleteResponse.Suggestion> suggestions = naverResult.items().stream()
+        List<AutocompleteResponse.Suggestion> suggestions = kakaoResult.documents().stream()
                 .limit(10)
-                .map(item -> {
-                    String name = item.cleanTitle();
-                    String address = (item.roadAddress() != null && !item.roadAddress().isBlank())
-                            ? item.roadAddress() : item.address();
-                    String category = PlaceCategory.fromNaverCategory(item.category()).name();
+                .map(doc -> {
+                    String name = doc.placeName();
+                    String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
+                    String category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode()).name();
                     return new AutocompleteResponse.Suggestion(null, name, address, category);
                 })
                 .toList();
@@ -140,13 +122,12 @@ public class SearchService {
         return new SearchHistoryResponse(items);
     }
 
-    private PlaceSearchResponse.PlaceItem buildSearchItem(NaverLocalResponse.Item naverItem, LocalDateTime since) {
-        String name = naverItem.cleanTitle();
-        String address = naverItem.roadAddress() != null && !naverItem.roadAddress().isBlank()
-                ? naverItem.roadAddress() : naverItem.address();
-        PlaceCategory category = PlaceCategory.fromNaverCategory(naverItem.category());
-        double lat = Double.parseDouble(naverItem.mapy()) / 10_000_000.0;
-        double lng = Double.parseDouble(naverItem.mapx()) / 10_000_000.0;
+    private PlaceSearchResponse.PlaceItem buildSearchItem(KakaoLocalResponse.Document doc, LocalDateTime since) {
+        String name = doc.placeName();
+        String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
+        PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
+        double lat = Double.parseDouble(doc.y());
+        double lng = Double.parseDouble(doc.x());
 
         // DB에 있으면 혼잡도·썸네일 포함, 없으면 upsert 후 반환
         Optional<Place> existing = placeRepository.findByNameAndIsActiveTrue(name);
@@ -154,8 +135,8 @@ public class SearchService {
             return toSearchItem(existing.get(), since);
         }
 
-        BigDecimal latitude = new BigDecimal(naverItem.mapy()).movePointLeft(7);
-        BigDecimal longitude = new BigDecimal(naverItem.mapx()).movePointLeft(7);
+        BigDecimal latitude = new BigDecimal(doc.y());
+        BigDecimal longitude = new BigDecimal(doc.x());
 
         Place saved = placeRepository.save(Place.builder()
                 .name(name)
@@ -163,7 +144,7 @@ public class SearchService {
                 .latitude(latitude)
                 .longitude(longitude)
                 .category(category)
-                .source("NAVER")
+                .source("KAKAO")
                 .build());
 
         return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null);

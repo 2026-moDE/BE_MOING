@@ -1,7 +1,7 @@
 package com.moing.backend.domain.place.service;
 
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
-import com.moing.backend.domain.place.dto.NaverLocalResponse;
+import com.moing.backend.domain.place.dto.KakaoLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
 import com.moing.backend.domain.place.dto.SubscribeResponse;
@@ -12,6 +12,7 @@ import com.moing.backend.domain.place.repository.PlaceSubscriptionRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import com.moing.backend.domain.place.entity.Place;
+import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.entity.Review;
@@ -43,7 +44,7 @@ public class PlaceService {
     private final ReviewRepository reviewRepository;
     private final PlaceCongestionCacheRepository congestionCacheRepository;
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
-    private final NaverSearchService naverSearchService;
+    private final KakaoSearchService kakaoSearchService;
 
     /**
      * 주변 장소 조회
@@ -59,7 +60,7 @@ public class PlaceService {
      * @param radius    검색 반경 (m)
      * @param query     네이버 검색어 (예: "카페", "맛집")
      */
-    // 주변 장소 조회 (네이버 검색 -> 좌표 변환 및 필터링 -> DB 매칭)
+    // 주변 장소 조회 (카카오 검색 -> DB 매칭)
     public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query, String filter) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
@@ -74,15 +75,14 @@ public class PlaceService {
             return new PlaceNearbyResponse(items);
         }
 
-        NaverLocalResponse naverResult = naverSearchService.search(query);
+        KakaoLocalResponse kakaoResult = kakaoSearchService.search(query, longitude, latitude, radius);
 
-        if (naverResult == null || naverResult.items() == null) {
+        if (kakaoResult == null || kakaoResult.documents() == null) {
             return new PlaceNearbyResponse(List.of());
         }
 
-        List<PlaceNearbyResponse.PlaceItem> items = naverResult.items().stream()
-                .map(item -> buildPlaceItem(item, latitude, longitude, radius, filter, since))
-                .filter(Objects::nonNull)
+        List<PlaceNearbyResponse.PlaceItem> items = kakaoResult.documents().stream()
+                .map(doc -> buildPlaceItemFromKakao(doc, filter, since))
                 .toList();
 
         return new PlaceNearbyResponse(items);
@@ -103,34 +103,25 @@ public class PlaceService {
         };
     }
 
-    // Naver 검색 결과 아이템을 PlaceItem DTO로 변환
-    private PlaceNearbyResponse.PlaceItem buildPlaceItem(
-            NaverLocalResponse.Item naverItem,
-            double userLat, double userLng, Integer radius, String filter,
-            LocalDateTime since) {
+    // 카카오 검색 결과를 PlaceItem DTO로 변환
+    private PlaceNearbyResponse.PlaceItem buildPlaceItemFromKakao(
+            KakaoLocalResponse.Document doc, String filter, LocalDateTime since) {
 
-        // 1. 네이버 좌표(10^7) -> WGS84 위경도로 직접 변환
-        double itemLng = Double.parseDouble(naverItem.mapx()) / 10_000_000.0;
-        double itemLat = Double.parseDouble(naverItem.mapy()) / 10_000_000.0;
+        double docLat = Double.parseDouble(doc.y());
+        double docLng = Double.parseDouble(doc.x());
+        String name = doc.placeName();
 
-        // 2. 반경 지정 시에만 필터링
-        if (radius != null && !isWithinRadius(userLat, userLng, itemLat, itemLng, radius)) {
-            return null;
-        }
-
-        // 3. 장소명 기준 내부 DB 매칭
-        String name = naverItem.cleanTitle();
         Optional<Place> dbPlace = placeRepository.findByNameAndIsActiveTrue(name);
 
-        // DB에 존재하면 상세 정보 포함해서 반환
         if (dbPlace.isPresent()) {
             Place place = dbPlace.get();
             PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
             return toItem(place, filter, since, cache);
         }
 
-        // DB에 없으면 네이버 정보만 반환
-        return new PlaceNearbyResponse.PlaceItem(null, name, itemLat, itemLng, null, null, null, null);
+        String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
+        PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
+        return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, category, address);
     }
 
     // placeId 목록으로 혼잡도 캐시를 한 번에 로드
@@ -167,6 +158,47 @@ public class PlaceService {
                 place.getCategory(),
                 place.getAddress()
         );
+    }
+
+    /**
+     * 장소 검색 (네이버 API + 위치 기반 필터링)
+     * latitude/longitude가 있으면 반경 내 결과만 반환, 없으면 전체 반환
+     */
+    public PlaceNearbyResponse searchPlaces(String keyword, Double latitude, Double longitude) {
+        KakaoLocalResponse kakaoResult = kakaoSearchService.search(
+                keyword,
+                longitude != null ? longitude : null,
+                latitude != null ? latitude : null,
+                null
+        );
+
+        if (kakaoResult == null || kakaoResult.documents() == null) {
+            return new PlaceNearbyResponse(List.of());
+        }
+
+        LocalDateTime since = LocalDateTime.now().minusHours(72);
+
+        List<PlaceNearbyResponse.PlaceItem> items = kakaoResult.documents().stream()
+                .map(doc -> {
+                    double docLng = Double.parseDouble(doc.x());
+                    double docLat = Double.parseDouble(doc.y());
+                    String name = doc.placeName();
+
+                    Optional<Place> dbPlace = placeRepository.findByNameAndIsActiveTrue(name);
+
+                    if (dbPlace.isPresent()) {
+                        Place place = dbPlace.get();
+                        PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
+                        return toItem(place, "all", since, cache);
+                    }
+
+                    String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
+                    PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
+                    return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, category, address);
+                })
+                .toList();
+
+        return new PlaceNearbyResponse(items);
     }
 
     /**
@@ -226,12 +258,6 @@ public class PlaceService {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         return (int) Math.round(EARTH_RADIUS * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a)));
-    }
-
-    // Haversine 공식을 이용한 거리 계산 및 반경 필터링
-    private boolean isWithinRadius(double userLat, double userLng,
-                                   double itemLat, double itemLng, int radius) {
-        return calculateDistance(userLat, userLng, itemLat, itemLng) <= radius;
     }
 
     @Transactional

@@ -10,6 +10,9 @@ import com.moing.backend.domain.place.service.CongestionCacheService;
 import com.moing.backend.domain.review.dto.ReviewCreateRequest;
 import com.moing.backend.domain.review.dto.ReviewCreateResponse;
 import com.moing.backend.domain.review.dto.ReviewListResponse;
+import com.moing.backend.domain.review.dto.ReviewReportRequest;
+import com.moing.backend.domain.review.entity.ReviewReport;
+import com.moing.backend.domain.review.repository.ReviewReportRepository;
 import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewHelpfulRepository;
@@ -36,6 +39,7 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final ReviewHelpfulRepository reviewHelpfulRepository;
+    private final ReviewReportRepository reviewReportRepository;
     private final PlaceRepository placeRepository;
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
     private final UserRepository userRepository;
@@ -54,6 +58,25 @@ public class ReviewService {
         }
 
         reviewRepository.delete(review);
+    }
+
+    // 리뷰 신고
+    @Transactional
+    public void reportReview(Long userId, Long reviewId, ReviewReportRequest request) {
+        if (!reviewRepository.existsById(reviewId)) {
+            throw new CustomException(ErrorCode.NOT_FOUND);
+        }
+
+        if (reviewReportRepository.existsByReviewIdAndReporterId(reviewId, userId)) {
+            throw new CustomException(ErrorCode.DUPLICATE);
+        }
+
+        reviewReportRepository.save(ReviewReport.builder()
+                .reviewId(reviewId)
+                .reporterId(userId)
+                .reason(request.reason())
+                .detail(request.detail())
+                .build());
     }
 
     // 리뷰 작성

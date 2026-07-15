@@ -14,5 +14,8 @@ public record OnboardingRequest(
         Boolean privacyAgreed,
 
         @JsonProperty("marketing_agreed")
-        Boolean marketingAgreed
+        Boolean marketingAgreed,
+
+        @JsonProperty("profile_image_url")
+        String profileImageUrl
 ) {}

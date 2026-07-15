@@ -41,8 +41,10 @@ public class SearchService {
      * 결과에 72h 이내 혼잡도·대표 사진을 조합하고 검색어를 search_history에 저장한다.
      */
     @Transactional
-    public PlaceSearchResponse searchPlaces(Long userId, String keyword) {
-        searchHistoryRepository.save(new SearchHistory(userId, keyword));
+    public PlaceSearchResponse searchPlaces(Long userId, String keyword, Double latitude, Double longitude, Integer radius, boolean saveHistory) {
+        if (saveHistory) {
+            searchHistoryRepository.save(new SearchHistory(userId, keyword));
+        }
 
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
@@ -59,11 +61,27 @@ public class SearchService {
             } else {
                 items = naverResult.items().stream()
                         .map(naverItem -> buildSearchItem(naverItem, since))
+                        .filter(item -> {
+                            if (latitude == null || longitude == null || radius == null) return true;
+                            int distance = calculateDistance(latitude, longitude, item.latitude(), item.longitude());
+                            return distance <= radius;
+                        })
                         .toList();
             }
 //        }
 
         return new PlaceSearchResponse(items);
+    }
+
+    // Haversine 공식으로 두 좌표 간 거리(m) 반환
+    private int calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+        final int EARTH_RADIUS = 6_371_000;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return (int) Math.round(EARTH_RADIUS * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a)));
     }
 
     /**

@@ -81,7 +81,7 @@ public class PlaceService {
         }
 
         List<PlaceNearbyResponse.PlaceItem> items = naverResult.items().stream()
-                .map(item -> buildPlaceItem(item, latitude, longitude, radius, since))
+                .map(item -> buildPlaceItem(item, latitude, longitude, radius, filter, since))
                 .filter(Objects::nonNull)
                 .toList();
 
@@ -106,7 +106,7 @@ public class PlaceService {
     // Naver 검색 결과 아이템을 PlaceItem DTO로 변환
     private PlaceNearbyResponse.PlaceItem buildPlaceItem(
             NaverLocalResponse.Item naverItem,
-            double userLat, double userLng, Integer radius,
+            double userLat, double userLng, Integer radius, String filter,
             LocalDateTime since) {
 
         // 1. 네이버 좌표(10^7) -> WGS84 위경도로 직접 변환
@@ -126,7 +126,7 @@ public class PlaceService {
         if (dbPlace.isPresent()) {
             Place place = dbPlace.get();
             PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
-            return toItem(place, "current", since, cache);
+            return toItem(place, filter, since, cache);
         }
 
         // DB에 없으면 네이버 정보만 반환

@@ -29,12 +29,16 @@ public class SearchController {
     @GetMapping
     public ResponseEntity<ApiResponse<PlaceSearchResponse>> searchPlaces(
             @AuthenticationPrincipal Long userId,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) Integer radius,
+            @RequestParam(defaultValue = "true") boolean saveHistory
     ) {
         if (!StringUtils.hasText(keyword)) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
-        return ResponseEntity.ok(ApiResponse.success("success", searchService.searchPlaces(userId, keyword)));
+        return ResponseEntity.ok(ApiResponse.success("success", searchService.searchPlaces(userId, keyword, latitude, longitude, radius, saveHistory)));
     }
 
     // 최근 검색어 목록 조회

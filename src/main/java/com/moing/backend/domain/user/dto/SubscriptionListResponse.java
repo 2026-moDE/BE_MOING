@@ -12,7 +12,8 @@ public record SubscriptionListResponse(
     public record PlaceInfo(
             Long id,
             String name,
-            String address
+            String address,
+            @JsonProperty("thumbnail_url") String thumbnailUrl
     ) {}
 
     public record SubscriptionItem(

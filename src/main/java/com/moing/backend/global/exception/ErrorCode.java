@@ -21,7 +21,10 @@ public enum ErrorCode {
 
     // --- 온보딩 및 유저 관련 에러 코드 추가 ---
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다"),
-    ALREADY_ONBOARDED(HttpStatus.CONFLICT, "이미 온보딩을 완료한 유저입니다");
+    ALREADY_ONBOARDED(HttpStatus.CONFLICT, "이미 온보딩을 완료한 유저입니다"),
+
+    // --- 유저 조회 관련 ---
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다");
 
     private final HttpStatus status;
     private final String message;

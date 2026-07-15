@@ -22,7 +22,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -147,23 +146,14 @@ public class UserService {
         Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
                 .collect(Collectors.toMap(Place::getId, Function.identity()));
 
-        // 72h 이내 가장 최근 이미지 URL을 장소별로 매핑
-        LocalDateTime since = LocalDateTime.now().minusHours(72);
-        Map<Long, String> thumbnailMap = placeIds.isEmpty()
-                ? Map.of()
-                : reviewRepository.findRecentReviewsWithImageByPlaceIds(placeIds, since).stream()
-                        .collect(Collectors.toMap(
-                                Review::getPlaceId,
-                                Review::getImageUrl,
-                                (first, second) -> first // 이미 createdAt DESC 정렬이므로 첫 번째가 최신
-                        ));
-
         List<SubscriptionListResponse.SubscriptionItem> items = subscriptions.stream().map(s -> {
             Place place = placeMap.get(s.getPlaceId());
-            String thumbnailUrl = thumbnailMap.get(s.getPlaceId());
+            String thumbnail = reviewRepository
+                    .findTopWithImageAllTimeByPlaceId(s.getPlaceId(), PageRequest.of(0, 1))
+                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
             SubscriptionListResponse.PlaceInfo placeInfo = place != null
-                    ? new SubscriptionListResponse.PlaceInfo(place.getId(), place.getName(), place.getAddress(), thumbnailUrl)
-                    : new SubscriptionListResponse.PlaceInfo(s.getPlaceId(), null, null, thumbnailUrl);
+                    ? new SubscriptionListResponse.PlaceInfo(place.getId(), place.getName(), place.getAddress(), thumbnail)
+                    : new SubscriptionListResponse.PlaceInfo(s.getPlaceId(), null, null, thumbnail);
             return new SubscriptionListResponse.SubscriptionItem(
                     s.getId(), placeInfo, true, s.getCreatedAt());
         }).toList();

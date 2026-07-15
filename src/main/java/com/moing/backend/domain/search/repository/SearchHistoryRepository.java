@@ -10,10 +10,18 @@ import java.util.List;
 
 public interface SearchHistoryRepository extends JpaRepository<SearchHistory, Long> {
 
-    @Query("SELECT s FROM SearchHistory s WHERE s.userId = :userId ORDER BY s.createdAt DESC")
+    @Query("""
+            SELECT s FROM SearchHistory s
+            WHERE s.userId = :userId
+              AND s.createdAt = (
+                  SELECT MAX(s2.createdAt) FROM SearchHistory s2
+                  WHERE s2.userId = s.userId AND s2.keyword = s.keyword
+              )
+            ORDER BY s.createdAt DESC
+            """)
     List<SearchHistory> findRecentByUserId(@Param("userId") Long userId, Pageable pageable);
 
     void deleteAllByUserId(Long userId);
 
-    boolean existsByIdAndUserId(Long id, Long userId);
+    void deleteAllByUserIdAndKeyword(Long userId, String keyword);
 }

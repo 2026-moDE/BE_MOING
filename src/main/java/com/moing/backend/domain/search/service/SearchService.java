@@ -36,16 +36,11 @@ public class SearchService {
 
     /**
      * 장소 검색
-     * (추후) keyword가 #으로 시작하면 quick_tag 기반 리뷰 검색,
-     * 네이버 검색 API 호출 후 내부 DB 매칭.
-     * 결과에 72h 이내 혼잡도·대표 사진을 조합하고 검색어를 search_history에 저장한다.
+     * 카카오 검색 API 호출 후 내부 DB 매칭.
+     * 결과에 72h 이내 혼잡도·대표 사진을 조합한다.
      */
     @Transactional
-    public PlaceSearchResponse searchPlaces(Long userId, String keyword, Double latitude, Double longitude, Integer radius, boolean saveHistory) {
-        if (saveHistory) {
-            searchHistoryRepository.save(new SearchHistory(userId, keyword));
-        }
-
+    public PlaceSearchResponse searchPlaces(Long userId, String keyword, Double latitude, Double longitude, Integer radius) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceSearchResponse.PlaceItem> items;
@@ -92,6 +87,14 @@ public class SearchService {
     }
 
     /**
+     * 검색어 저장 (장소 선택 시 호출)
+     */
+    @Transactional
+    public void saveSearchHistory(Long userId, String keyword) {
+        searchHistoryRepository.save(new SearchHistory(userId, keyword));
+    }
+
+    /**
      * 최근 검색어 전체 삭제
      */
     @Transactional
@@ -100,14 +103,11 @@ public class SearchService {
     }
 
     /**
-     * 최근 검색어 개별 삭제
+     * 최근 검색어 개별 삭제 (같은 키워드 전체 삭제)
      */
     @Transactional
-    public void deleteSearchHistory(Long id, Long userId) {
-        if (!searchHistoryRepository.existsByIdAndUserId(id, userId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
-        searchHistoryRepository.deleteById(id);
+    public void deleteSearchHistoryByKeyword(Long userId, String keyword) {
+        searchHistoryRepository.deleteAllByUserIdAndKeyword(userId, keyword);
     }
 
     /**
@@ -115,7 +115,7 @@ public class SearchService {
      */
     public SearchHistoryResponse getSearchHistory(Long userId) {
         List<SearchHistoryResponse.HistoryItem> items = searchHistoryRepository
-                .findRecentByUserId(userId, PageRequest.of(0, 20))
+                .findRecentByUserId(userId, PageRequest.of(0, 5))
                 .stream()
                 .map(SearchHistoryResponse.HistoryItem::from)
                 .toList();

@@ -13,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,13 +32,22 @@ public class SearchController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Integer radius,
-            @RequestParam(defaultValue = "true") boolean saveHistory
+            @RequestParam(required = false) Integer radius
     ) {
         if (!StringUtils.hasText(keyword)) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
-        return ResponseEntity.ok(ApiResponse.success("success", searchService.searchPlaces(userId, keyword, latitude, longitude, radius, saveHistory)));
+        return ResponseEntity.ok(ApiResponse.success("success", searchService.searchPlaces(userId, keyword, latitude, longitude, radius)));
+    }
+
+    // 검색어 저장 (장소 선택 시 클라이언트에서 호출)
+    @PostMapping("/history")
+    public ResponseEntity<ApiResponse<Void>> saveSearchHistory(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String keyword
+    ) {
+        searchService.saveSearchHistory(userId, keyword);
+        return ResponseEntity.ok(ApiResponse.success("success", null));
     }
 
     // 최근 검색어 목록 조회
@@ -50,7 +59,7 @@ public class SearchController {
     }
 
     // 최근 검색어 전체 삭제
-    @DeleteMapping("/history")
+    @DeleteMapping("/history/all")
     public ResponseEntity<ApiResponse<Void>> deleteAllSearchHistory(
             @AuthenticationPrincipal Long userId
     ) {
@@ -58,13 +67,13 @@ public class SearchController {
         return ResponseEntity.ok(ApiResponse.success("success", null));
     }
 
-    // 최근 검색어 개별 삭제
-    @DeleteMapping("/history/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteSearchHistory(
+    // 최근 검색어 개별 삭제 (같은 키워드 전체 삭제)
+    @DeleteMapping("/history")
+    public ResponseEntity<ApiResponse<Void>> deleteSearchHistoryByKeyword(
             @AuthenticationPrincipal Long userId,
-            @PathVariable Long id
+            @RequestParam String keyword
     ) {
-        searchService.deleteSearchHistory(id, userId);
+        searchService.deleteSearchHistoryByKeyword(userId, keyword);
         return ResponseEntity.ok(ApiResponse.success("success", null));
     }
 

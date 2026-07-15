@@ -148,9 +148,12 @@ public class UserService {
 
         List<SubscriptionListResponse.SubscriptionItem> items = subscriptions.stream().map(s -> {
             Place place = placeMap.get(s.getPlaceId());
+            String thumbnail = reviewRepository
+                    .findTopWithImageAllTimeByPlaceId(s.getPlaceId(), PageRequest.of(0, 1))
+                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
             SubscriptionListResponse.PlaceInfo placeInfo = place != null
-                    ? new SubscriptionListResponse.PlaceInfo(place.getId(), place.getName(), place.getAddress())
-                    : new SubscriptionListResponse.PlaceInfo(s.getPlaceId(), null, null);
+                    ? new SubscriptionListResponse.PlaceInfo(place.getId(), place.getName(), place.getAddress(), thumbnail)
+                    : new SubscriptionListResponse.PlaceInfo(s.getPlaceId(), null, null, thumbnail);
             return new SubscriptionListResponse.SubscriptionItem(
                     s.getId(), placeInfo, true, s.getCreatedAt());
         }).toList();

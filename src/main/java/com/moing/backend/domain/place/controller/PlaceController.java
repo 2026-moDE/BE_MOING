@@ -83,6 +83,17 @@ public class PlaceController {
         return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query, filter));
     }
 
+    // 장소 검색 (카카오 로컬 API + 위치 기반 정렬)
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<PlaceNearbyResponse>> searchPlaces(
+            @RequestParam String keyword,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                placeService.searchPlaces(keyword, latitude, longitude)));
+    }
+
     @PostMapping("/{id}/subscribe")
     public ResponseEntity<ApiResponse<SubscribeResponse>> subscribe(
             @AuthenticationPrincipal Long userId,

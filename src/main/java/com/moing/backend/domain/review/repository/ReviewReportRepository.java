@@ -15,6 +15,8 @@ public interface ReviewReportRepository extends JpaRepository<ReviewReport, Long
 
     long countByStatus(ReportStatus status);
 
+    List<ReviewReport> findByReviewIdAndStatus(Long reviewId, ReportStatus status);
+
     @Query("""
             SELECT r FROM ReviewReport r
             WHERE (:status IS NULL OR r.status = :status)

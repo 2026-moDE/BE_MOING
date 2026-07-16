@@ -102,11 +102,20 @@ public class AdminReportService {
         ReviewReport report = reviewReportRepository.findById(reportId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
-        report.process(reportStatus, adminId);
+        if (reportStatus == ReportStatus.REJECTED) {
+            report.process(ReportStatus.REJECTED, adminId);
+        } else {
+            // RESOLVED: 같은 review_id의 PENDING 신고를 전부 처리
+            List<ReviewReport> pendingReports = reviewReportRepository
+                    .findByReviewIdAndStatus(report.getReviewId(), ReportStatus.PENDING);
+            for (ReviewReport r : pendingReports) {
+                r.process(ReportStatus.RESOLVED, adminId);
+            }
+            // 요청받은 건이 PENDING이 아니었더라도 RESOLVED로 변경
+            report.process(ReportStatus.RESOLVED, adminId);
 
-        if (reportStatus == ReportStatus.RESOLVED) {
-            Optional<Review> review = reviewRepository.findById(report.getReviewId());
-            review.ifPresent(Review::blind);
+            reviewRepository.findById(report.getReviewId())
+                    .ifPresent(Review::blind);
         }
     }
 }

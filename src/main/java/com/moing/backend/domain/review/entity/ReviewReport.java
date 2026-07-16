@@ -55,4 +55,10 @@ public class ReviewReport {
         this.detail = detail;
         this.status = ReportStatus.PENDING;
     }
+
+    public void process(ReportStatus status, Long adminId) {
+        this.status = status;
+        this.processedAt = LocalDateTime.now();
+        this.processedBy = adminId;
+    }
 }

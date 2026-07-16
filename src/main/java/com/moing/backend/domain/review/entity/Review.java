@@ -56,6 +56,9 @@ public class Review {
     @Column(name = "view_count", nullable = false)
     private int viewCount;
 
+    @Column(name = "is_blinded", nullable = false)
+    private boolean isBlinded;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -75,5 +78,10 @@ public class Review {
         this.status = "ACTIVE";
         this.helpfulCount = 0;
         this.viewCount = 0;
+        this.isBlinded = false;
+    }
+
+    public void blind() {
+        this.isBlinded = true;
     }
 }

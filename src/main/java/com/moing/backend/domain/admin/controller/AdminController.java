@@ -5,9 +5,11 @@ import com.moing.backend.domain.admin.dto.AdminLoginResponse;
 import com.moing.backend.domain.admin.dto.AdminReportListResponse;
 import com.moing.backend.domain.admin.dto.AdminReportProcessRequest;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
+import com.moing.backend.domain.admin.dto.AdminUserListResponse;
 import com.moing.backend.domain.admin.service.AdminAuthService;
 import com.moing.backend.domain.admin.service.AdminReportService;
 import com.moing.backend.domain.admin.service.AdminStatsService;
+import com.moing.backend.domain.admin.service.AdminUserService;
 import com.moing.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -35,6 +37,7 @@ public class AdminController {
     private final AdminAuthService adminAuthService;
     private final AdminStatsService adminStatsService;
     private final AdminReportService adminReportService;
+    private final AdminUserService adminUserService;
 
     @Operation(summary = "관리자 로그인", description = "이메일과 비밀번호로 관리자 로그인 후 JWT 토큰을 발급합니다.")
     @ApiResponses({
@@ -72,5 +75,14 @@ public class AdminController {
             @AuthenticationPrincipal Long adminId) {
         adminReportService.processReport(id, request.getStatus(), adminId);
         return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
+    }
+
+    @Operation(summary = "사용자 목록 조회", description = "사용자 목록을 커서 기반 페이지네이션으로 조회합니다.")
+    @GetMapping("/users")
+    public ResponseEntity<ApiResponse<AdminUserListResponse>> getUsers(
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                adminUserService.getUsers(cursor, limit)));
     }
 }

@@ -144,4 +144,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     /** 장소명 목록으로 활성 장소를 일괄 조회한다 (자동완성 N+1 방지) */
     List<Place> findByNameInAndIsActiveTrue(List<String> names);
+
+    /** 활성 장소 수 (관리자 통계) */
+    long countByIsActiveTrue();
 }

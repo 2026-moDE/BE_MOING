@@ -2,8 +2,10 @@ package com.moing.backend.domain.admin.controller;
 
 import com.moing.backend.domain.admin.dto.AdminLoginRequest;
 import com.moing.backend.domain.admin.dto.AdminLoginResponse;
+import com.moing.backend.domain.admin.dto.AdminReportListResponse;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
 import com.moing.backend.domain.admin.service.AdminAuthService;
+import com.moing.backend.domain.admin.service.AdminReportService;
 import com.moing.backend.domain.admin.service.AdminStatsService;
 import com.moing.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Admin", description = "관리자 API")
@@ -27,6 +30,7 @@ public class AdminController {
 
     private final AdminAuthService adminAuthService;
     private final AdminStatsService adminStatsService;
+    private final AdminReportService adminReportService;
 
     @Operation(summary = "관리자 로그인", description = "이메일과 비밀번호로 관리자 로그인 후 JWT 토큰을 발급합니다.")
     @ApiResponses({
@@ -44,5 +48,15 @@ public class AdminController {
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<AdminStatsResponse>> getStats() {
         return ResponseEntity.ok(ApiResponse.success("success", adminStatsService.getStats()));
+    }
+
+    @Operation(summary = "신고 목록 조회", description = "신고 목록을 커서 기반 페이지네이션으로 조회합니다. status 필터 선택 가능.")
+    @GetMapping("/reports")
+    public ResponseEntity<ApiResponse<AdminReportListResponse>> getReports(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                adminReportService.getReports(status, cursor, limit)));
     }
 }

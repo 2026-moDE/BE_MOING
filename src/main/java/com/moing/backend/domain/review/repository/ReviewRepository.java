@@ -152,4 +152,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("year") Integer year,
             @Param("month") Integer month,
             Pageable pageable);
+
+    // 오늘 리뷰 수 (관리자 통계)
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
 }

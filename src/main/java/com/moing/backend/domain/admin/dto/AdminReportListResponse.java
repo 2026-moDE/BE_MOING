@@ -1,5 +1,6 @@
 package com.moing.backend.domain.admin.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
@@ -21,6 +22,7 @@ public record AdminReportListResponse(
             String detail,
             @JsonProperty("reporter_nickname") String reporterNickname,
             String status,
+            @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
             @JsonProperty("created_at") LocalDateTime createdAt
     ) {}
 }

@@ -5,6 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -25,4 +28,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 활성 유저 수
     long countByDeletedAtIsNull();
+
+    // 관리자 사용자 목록 (review_count 포함, N+1 방지)
+    @Query(value = """
+            SELECT u.id, u.nickname, u.email, u.profile_image_url,
+                   COUNT(r.id) AS review_count, u.created_at
+            FROM users u
+            LEFT JOIN reviews r ON r.user_id = u.id
+            WHERE u.deleted_at IS NULL
+              AND (:cursor IS NULL OR u.id < :cursor)
+            GROUP BY u.id
+            ORDER BY u.id DESC
+            """, nativeQuery = true)
+    List<Object[]> findUsersWithReviewCount(@Param("cursor") Long cursor, Pageable pageable);
 }

@@ -24,7 +24,10 @@ public enum ErrorCode {
     ALREADY_ONBOARDED(HttpStatus.CONFLICT, "이미 온보딩을 완료한 유저입니다"),
 
     // --- 유저 조회 관련 ---
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다");
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),
+
+    // --- 관리자 관련 ---
+    ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");
 
     private final HttpStatus status;
     private final String message;

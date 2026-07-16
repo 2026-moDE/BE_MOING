@@ -15,8 +15,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -79,5 +82,31 @@ public class AdminReportService {
         }).toList();
 
         return new AdminReportListResponse(items, nextCursor);
+    }
+
+    private static final Set<ReportStatus> ALLOWED_STATUSES = Set.of(ReportStatus.RESOLVED, ReportStatus.REJECTED);
+
+    @Transactional
+    public void processReport(Long reportId, String status, Long adminId) {
+        ReportStatus reportStatus;
+        try {
+            reportStatus = ReportStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (!ALLOWED_STATUSES.contains(reportStatus)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        ReviewReport report = reviewReportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        report.process(reportStatus, adminId);
+
+        if (reportStatus == ReportStatus.RESOLVED) {
+            Optional<Review> review = reviewRepository.findById(report.getReviewId());
+            review.ifPresent(Review::blind);
+        }
     }
 }

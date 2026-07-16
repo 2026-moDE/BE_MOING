@@ -33,6 +33,16 @@ public class ReviewReport {
     @Column(name = "detail", length = 100)
     private String detail;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReportStatus status = ReportStatus.PENDING;
+
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+
+    @Column(name = "processed_by")
+    private Long processedBy;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -43,5 +53,12 @@ public class ReviewReport {
         this.reporterId = reporterId;
         this.reason = reason;
         this.detail = detail;
+        this.status = ReportStatus.PENDING;
+    }
+
+    public void process(ReportStatus status, Long adminId) {
+        this.status = status;
+        this.processedAt = LocalDateTime.now();
+        this.processedBy = adminId;
     }
 }

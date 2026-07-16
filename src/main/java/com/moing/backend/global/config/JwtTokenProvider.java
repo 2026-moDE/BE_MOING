@@ -32,9 +32,21 @@ public class JwtTokenProvider {
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
-    // 액세스 토큰 발급
+    // 액세스 토큰 발급 (일반 유저 - role=USER)
     public String generateAccessToken(Long userId) {
-        return buildToken(userId, accessTokenExpiration);
+        return generateAccessToken(userId, "USER");
+    }
+
+    // 액세스 토큰 발급 (role 지정)
+    public String generateAccessToken(Long id, String role) {
+        Date now = new Date();
+        return Jwts.builder()
+                .setSubject(String.valueOf(id))
+                .claim("role", role)
+                .setIssuedAt(now)
+                .setExpiration(new Date(now.getTime() + accessTokenExpiration))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
 
     // 리프레시 토큰 발급
@@ -46,6 +58,13 @@ public class JwtTokenProvider {
     public Long getUserIdFromToken(String token) {
         Claims claims = parseClaims(token);
         return Long.parseLong(claims.getSubject());
+    }
+
+    // 토큰에서 role 추출
+    public String getRoleFromToken(String token) {
+        Claims claims = parseClaims(token);
+        String role = claims.get("role", String.class);
+        return role != null ? role : "USER";
     }
 
     // 토큰 유효성 검사 - 만료되거나 잘못된 토큰이면 false 반환

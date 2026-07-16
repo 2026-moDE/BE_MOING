@@ -22,4 +22,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 닉네임 중복 체크 (탈퇴하지 않은 유저 중 검색)
     boolean existsByNicknameAndDeletedAtIsNull(String nickname);
+
+    // 활성 유저 수
+    long countByDeletedAtIsNull();
 }

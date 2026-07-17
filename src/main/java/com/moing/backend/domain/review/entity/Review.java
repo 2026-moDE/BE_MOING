@@ -84,4 +84,8 @@ public class Review {
     public void blind() {
         this.isBlinded = true;
     }
+
+    public void unblind() {
+        this.isBlinded = false;
+    }
 }

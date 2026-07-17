@@ -1,6 +1,7 @@
 package com.moing.backend.domain.admin.service;
 
 import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
+import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -60,5 +61,22 @@ public class AdminReviewService {
         }).toList();
 
         return new AdminReviewListResponse(items, nextCursor);
+    }
+
+    @Transactional
+    public void blindReview(Long reviewId, String status) {
+        String upper = status.toUpperCase();
+        if (!"BLINDED".equals(upper) && !"ACTIVE".equals(upper)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if ("BLINDED".equals(upper)) {
+            review.blind();
+        } else {
+            review.unblind();
+        }
     }
 }

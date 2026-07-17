@@ -155,4 +155,23 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 오늘 리뷰 수 (관리자 통계)
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
+
+    // 관리자 리뷰 목록 (place_name, author_nickname 조인, 블라인드 포함)
+    @Query(value = """
+            SELECT r.id, p.name AS place_name, r.image_url, r.congestion_level,
+                   r.comment, u.nickname AS author_nickname,
+                   r.is_blinded, r.status, r.created_at
+            FROM reviews r
+            LEFT JOIN places p ON p.id = r.place_id
+            LEFT JOIN users u ON u.id = r.user_id
+            WHERE (:cursor IS NULL OR r.id < :cursor)
+              AND (:filterStatus IS NULL
+                   OR (:filterStatus = 'BLINDED' AND r.is_blinded = true)
+                   OR (:filterStatus = 'ACTIVE' AND r.status = 'ACTIVE' AND r.is_blinded = false)
+                   OR (:filterStatus = 'ARCHIVED' AND r.status = 'ARCHIVED' AND r.is_blinded = false))
+            ORDER BY r.id DESC
+            """, nativeQuery = true)
+    List<Object[]> findAdminReviews(@Param("filterStatus") String filterStatus,
+                                    @Param("cursor") Long cursor,
+                                    Pageable pageable);
 }

@@ -7,6 +7,7 @@ import com.moing.backend.domain.admin.dto.AdminReportProcessRequest;
 import com.moing.backend.domain.admin.dto.AdminReviewBlindRequest;
 import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
 import com.moing.backend.domain.admin.dto.AdminPlaceListResponse;
+import com.moing.backend.domain.admin.dto.AdminPlaceUpdateRequest;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
 import com.moing.backend.domain.admin.dto.AdminUserListResponse;
 import com.moing.backend.domain.admin.service.AdminAuthService;
@@ -111,6 +112,15 @@ public class AdminController {
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
         return ResponseEntity.ok(ApiResponse.success("success",
                 adminPlaceService.getPlaces(keyword, cursor, limit)));
+    }
+
+    @Operation(summary = "장소 수정", description = "장소의 is_active, category를 수정합니다.")
+    @PatchMapping("/places/{id}")
+    public ResponseEntity<ApiResponse<Void>> updatePlace(
+            @PathVariable Long id,
+            @RequestBody AdminPlaceUpdateRequest request) {
+        adminPlaceService.updatePlace(id, request);
+        return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
     }
 
     @Operation(summary = "사용자 목록 조회", description = "사용자 목록을 커서 기반 페이지네이션으로 조회합니다.")

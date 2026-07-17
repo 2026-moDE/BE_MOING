@@ -1,7 +1,12 @@
 package com.moing.backend.domain.admin.service;
 
 import com.moing.backend.domain.admin.dto.AdminPlaceListResponse;
+import com.moing.backend.domain.admin.dto.AdminPlaceUpdateRequest;
+import com.moing.backend.domain.place.entity.Place;
+import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.place.repository.PlaceRepository;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -45,5 +50,31 @@ public class AdminPlaceService {
         ).toList();
 
         return new AdminPlaceListResponse(items, nextCursor);
+    }
+
+    @Transactional
+    public void updatePlace(Long placeId, AdminPlaceUpdateRequest request) {
+        if (request.getActive() == null && request.getCategory() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        Place place = placeRepository.findById(placeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (request.getActive() != null) {
+            place.updateIsActive(request.getActive());
+        }
+
+        if (request.getCategory() != null) {
+            String cat = request.getCategory().trim();
+            if (cat.isEmpty()) {
+                throw new CustomException(ErrorCode.INVALID_INPUT);
+            }
+            try {
+                place.updateCategory(PlaceCategory.valueOf(cat.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                throw new CustomException(ErrorCode.INVALID_INPUT);
+            }
+        }
     }
 }

@@ -215,7 +215,7 @@ public class PlaceService {
 
         PlaceCongestionCache cache = congestionCacheRepository.findById(placeId).orElse(null);
 
-        long reviewCount = reviewRepository.countByPlaceIdAndCreatedAtAfter(placeId, since);
+        long reviewCount = reviewRepository.countByPlaceIdAndIsBlindedFalseAndCreatedAtAfter(placeId, since);
 
         return new PlaceDetailResponse(
                 place.getId(),

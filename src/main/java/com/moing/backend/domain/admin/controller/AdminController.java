@@ -4,10 +4,16 @@ import com.moing.backend.domain.admin.dto.AdminLoginRequest;
 import com.moing.backend.domain.admin.dto.AdminLoginResponse;
 import com.moing.backend.domain.admin.dto.AdminReportListResponse;
 import com.moing.backend.domain.admin.dto.AdminReportProcessRequest;
+import com.moing.backend.domain.admin.dto.AdminReviewBlindRequest;
+import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
+import com.moing.backend.domain.admin.dto.AdminPlaceListResponse;
+import com.moing.backend.domain.admin.dto.AdminPlaceUpdateRequest;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
 import com.moing.backend.domain.admin.dto.AdminUserListResponse;
 import com.moing.backend.domain.admin.service.AdminAuthService;
+import com.moing.backend.domain.admin.service.AdminPlaceService;
 import com.moing.backend.domain.admin.service.AdminReportService;
+import com.moing.backend.domain.admin.service.AdminReviewService;
 import com.moing.backend.domain.admin.service.AdminStatsService;
 import com.moing.backend.domain.admin.service.AdminUserService;
 import com.moing.backend.global.response.ApiResponse;
@@ -36,7 +42,9 @@ public class AdminController {
 
     private final AdminAuthService adminAuthService;
     private final AdminStatsService adminStatsService;
+    private final AdminPlaceService adminPlaceService;
     private final AdminReportService adminReportService;
+    private final AdminReviewService adminReviewService;
     private final AdminUserService adminUserService;
 
     @Operation(summary = "관리자 로그인", description = "이메일과 비밀번호로 관리자 로그인 후 JWT 토큰을 발급합니다.")
@@ -74,6 +82,44 @@ public class AdminController {
             @RequestBody @Valid AdminReportProcessRequest request,
             @AuthenticationPrincipal Long adminId) {
         adminReportService.processReport(id, request.getStatus(), adminId);
+        return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
+    }
+
+    @Operation(summary = "리뷰 목록 조회", description = "리뷰 목록을 커서 기반 페이지네이션으로 조회합니다. status 필터(ACTIVE/ARCHIVED/BLINDED) 선택 가능.")
+    @GetMapping("/reviews")
+    public ResponseEntity<ApiResponse<AdminReviewListResponse>> getReviews(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                adminReviewService.getReviews(status, cursor, limit)));
+    }
+
+    @Operation(summary = "리뷰 블라인드 처리", description = "리뷰를 BLINDED(블라인드) 또는 ACTIVE(블라인드 해제) 처리합니다.")
+    @PatchMapping("/reviews/{id}")
+    public ResponseEntity<ApiResponse<Void>> blindReview(
+            @PathVariable Long id,
+            @RequestBody @Valid AdminReviewBlindRequest request) {
+        adminReviewService.blindReview(id, request.getStatus());
+        return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
+    }
+
+    @Operation(summary = "장소 목록 조회", description = "장소 목록을 커서 기반 페이지네이션으로 조회합니다. keyword로 이름/주소 검색 가능.")
+    @GetMapping("/places")
+    public ResponseEntity<ApiResponse<AdminPlaceListResponse>> getPlaces(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                adminPlaceService.getPlaces(keyword, cursor, limit)));
+    }
+
+    @Operation(summary = "장소 수정", description = "장소의 is_active, category를 수정합니다.")
+    @PatchMapping("/places/{id}")
+    public ResponseEntity<ApiResponse<Void>> updatePlace(
+            @PathVariable Long id,
+            @RequestBody AdminPlaceUpdateRequest request) {
+        adminPlaceService.updatePlace(id, request);
         return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
     }
 

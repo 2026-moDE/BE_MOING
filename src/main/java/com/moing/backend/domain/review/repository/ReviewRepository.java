@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 72h 이내 가장 최근 리뷰 (혼잡도)
-    Optional<Review> findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(
+    Optional<Review> findTopByPlaceIdAndIsBlindedFalseAndCreatedAtAfterOrderByCreatedAtDesc(
             Long placeId, LocalDateTime since);
 
     // 72h 이내 helpful_count 가장 높은 리뷰 (대표 사진)
@@ -22,6 +22,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             WHERE r.placeId = :placeId
               AND r.createdAt > :since
               AND r.imageUrl IS NOT NULL
+              AND r.isBlinded = false
             ORDER BY r.helpfulCount DESC, r.createdAt DESC
             """)
     List<Review> findTopWithImageByPlaceId(
@@ -34,6 +35,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.imageUrl IS NOT NULL
+              AND r.isBlinded = false
             ORDER BY r.helpfulCount DESC, r.createdAt DESC
             """)
     List<Review> findTopWithImageAllTimeByPlaceId(
@@ -46,6 +48,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             WHERE r.placeId = :placeId
               AND r.createdAt <= :since
               AND r.imageUrl IS NOT NULL
+              AND r.isBlinded = false
             ORDER BY r.helpfulCount DESC, r.createdAt DESC
             """)
     List<Review> findTopWithArchivedImageByPlaceId(
@@ -54,13 +57,14 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             Pageable pageable);
 
     // 72h 이내 리뷰 수 (상세 조회용)
-    long countByPlaceIdAndCreatedAtAfter(Long placeId, LocalDateTime since);
+    long countByPlaceIdAndIsBlindedFalseAndCreatedAtAfter(Long placeId, LocalDateTime since);
 
     // 72h 이내 커서 기반 조회 (현재 리뷰)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.createdAt > :since
+              AND r.isBlinded = false
               AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC
             """)
@@ -75,6 +79,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.createdAt <= :since
+              AND r.isBlinded = false
               AND (:cursor IS NULL OR r.id < :cursor)
             ORDER BY r.id DESC
             """)
@@ -85,11 +90,11 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             Pageable pageable);
 
     // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 수 조회
-    @Query("SELECT COUNT(r) FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since AND r.isBlinded = false")
     long countByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
 
     // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 목록 조회
-    @Query("SELECT r FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since")
+    @Query("SELECT r FROM Review r WHERE r.placeId IN :placeIds AND r.createdAt > :since AND r.isBlinded = false")
     List<Review> findByPlaceIdsAndCreatedAtAfter(@Param("placeIds") List<Long> placeIds, @Param("since") LocalDateTime since);
 
     // 마이페이지: 사용자 리뷰 수
@@ -105,6 +110,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             WHERE r.placeId IN :placeIds
               AND r.createdAt > :since
               AND r.imageUrl IS NOT NULL
+              AND r.isBlinded = false
             ORDER BY r.createdAt DESC
             """)
     List<Review> findRecentReviewsWithImageByPlaceIds(
@@ -112,7 +118,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("since") LocalDateTime since);
 
     // quick_tag로 장소 ID 검색
-    @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag")
+    @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag AND r.isBlinded = false")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);
 
     // 혼잡도 캐시 배치용: 최근 N시간 ACTIVE 리뷰 전체 (placeId 순, 최신 순)
@@ -120,6 +126,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             SELECT r FROM Review r
             WHERE r.createdAt > :since
               AND r.status = 'ACTIVE'
+              AND r.isBlinded = false
             ORDER BY r.placeId ASC, r.createdAt DESC
             """)
     List<Review> findAllRecentActiveReviews(@Param("since") LocalDateTime since);
@@ -130,6 +137,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             WHERE r.placeId = :placeId
               AND r.createdAt > :since
               AND r.status = 'ACTIVE'
+              AND r.isBlinded = false
             ORDER BY r.createdAt DESC
             """)
     List<Review> findRecentActiveReviewsByPlaceId(
@@ -155,4 +163,23 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 오늘 리뷰 수 (관리자 통계)
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
+
+    // 관리자 리뷰 목록 (place_name, author_nickname 조인, 블라인드 포함)
+    @Query(value = """
+            SELECT r.id, p.name AS place_name, r.image_url, r.congestion_level,
+                   r.comment, u.nickname AS author_nickname,
+                   r.is_blinded, r.status, r.created_at
+            FROM reviews r
+            LEFT JOIN places p ON p.id = r.place_id
+            LEFT JOIN users u ON u.id = r.user_id
+            WHERE (:cursor IS NULL OR r.id < :cursor)
+              AND (:filterStatus IS NULL
+                   OR (:filterStatus = 'BLINDED' AND r.is_blinded = true)
+                   OR (:filterStatus = 'ACTIVE' AND r.status = 'ACTIVE' AND r.is_blinded = false)
+                   OR (:filterStatus = 'ARCHIVED' AND r.status = 'ARCHIVED' AND r.is_blinded = false))
+            ORDER BY r.id DESC
+            """, nativeQuery = true)
+    List<Object[]> findAdminReviews(@Param("filterStatus") String filterStatus,
+                                    @Param("cursor") Long cursor,
+                                    Pageable pageable);
 }

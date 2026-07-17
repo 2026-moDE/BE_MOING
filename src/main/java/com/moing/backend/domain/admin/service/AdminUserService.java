@@ -33,7 +33,7 @@ public class AdminUserService {
                         (String) row[2],
                         (String) row[3],
                         (Long) row[4],
-                        ((java.sql.Timestamp) row[5]).toLocalDateTime()
+                        (java.time.LocalDateTime) row[5]
                 )
         ).toList();
 

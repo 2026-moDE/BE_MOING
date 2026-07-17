@@ -54,4 +54,12 @@ public class Place {
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public void updateIsActive(boolean isActive) {
+        this.isActive = isActive;
+    }
+
+    public void updateCategory(PlaceCategory category) {
+        this.category = category;
+    }
 }

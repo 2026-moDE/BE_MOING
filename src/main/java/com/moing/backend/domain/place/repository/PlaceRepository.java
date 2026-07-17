@@ -1,6 +1,7 @@
 package com.moing.backend.domain.place.repository;
 
 import com.moing.backend.domain.place.entity.Place;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -147,4 +148,21 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     /** 활성 장소 수 (관리자 통계) */
     long countByIsActiveTrue();
+
+    /** 관리자 장소 목록 (review_count 포함, keyword 검색, N+1 방지) */
+    @Query(value = """
+            SELECT p.id, p.name, p.address, p.category,
+                   COUNT(r.id) AS review_count, p.is_active, p.created_at
+            FROM places p
+            LEFT JOIN reviews r ON r.place_id = p.id
+            WHERE (:cursor IS NULL OR p.id < :cursor)
+              AND (:keyword IS NULL
+                   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(p.address) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            GROUP BY p.id
+            ORDER BY p.id DESC
+            """, nativeQuery = true)
+    List<Object[]> findAdminPlaces(@Param("keyword") String keyword,
+                                   @Param("cursor") Long cursor,
+                                   Pageable pageable);
 }

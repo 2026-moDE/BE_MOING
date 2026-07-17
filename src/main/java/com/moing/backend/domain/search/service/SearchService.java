@@ -152,7 +152,7 @@ public class SearchService {
 
     private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {
         var congestionLevel = reviewRepository
-                .findTopByPlaceIdAndCreatedAtAfterOrderByCreatedAtDesc(place.getId(), since)
+                .findTopByPlaceIdAndIsBlindedFalseAndCreatedAtAfterOrderByCreatedAtDesc(place.getId(), since)
                 .map(Review::getCongestionLevel)
                 .orElse(null);
 

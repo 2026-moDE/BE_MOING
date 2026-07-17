@@ -4,6 +4,7 @@ import com.moing.backend.domain.admin.dto.AdminLoginRequest;
 import com.moing.backend.domain.admin.dto.AdminLoginResponse;
 import com.moing.backend.domain.admin.dto.AdminReportListResponse;
 import com.moing.backend.domain.admin.dto.AdminReportProcessRequest;
+import com.moing.backend.domain.admin.dto.AdminReviewBlindRequest;
 import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
 import com.moing.backend.domain.admin.dto.AdminUserListResponse;
@@ -88,6 +89,15 @@ public class AdminController {
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
         return ResponseEntity.ok(ApiResponse.success("success",
                 adminReviewService.getReviews(status, cursor, limit)));
+    }
+
+    @Operation(summary = "리뷰 블라인드 처리", description = "리뷰를 BLINDED(블라인드) 또는 ACTIVE(블라인드 해제) 처리합니다.")
+    @PatchMapping("/reviews/{id}")
+    public ResponseEntity<ApiResponse<Void>> blindReview(
+            @PathVariable Long id,
+            @RequestBody @Valid AdminReviewBlindRequest request) {
+        adminReviewService.blindReview(id, request.getStatus());
+        return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
     }
 
     @Operation(summary = "사용자 목록 조회", description = "사용자 목록을 커서 기반 페이지네이션으로 조회합니다.")

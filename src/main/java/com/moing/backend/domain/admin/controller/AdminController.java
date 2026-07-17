@@ -6,9 +6,11 @@ import com.moing.backend.domain.admin.dto.AdminReportListResponse;
 import com.moing.backend.domain.admin.dto.AdminReportProcessRequest;
 import com.moing.backend.domain.admin.dto.AdminReviewBlindRequest;
 import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
+import com.moing.backend.domain.admin.dto.AdminPlaceListResponse;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
 import com.moing.backend.domain.admin.dto.AdminUserListResponse;
 import com.moing.backend.domain.admin.service.AdminAuthService;
+import com.moing.backend.domain.admin.service.AdminPlaceService;
 import com.moing.backend.domain.admin.service.AdminReportService;
 import com.moing.backend.domain.admin.service.AdminReviewService;
 import com.moing.backend.domain.admin.service.AdminStatsService;
@@ -39,6 +41,7 @@ public class AdminController {
 
     private final AdminAuthService adminAuthService;
     private final AdminStatsService adminStatsService;
+    private final AdminPlaceService adminPlaceService;
     private final AdminReportService adminReportService;
     private final AdminReviewService adminReviewService;
     private final AdminUserService adminUserService;
@@ -98,6 +101,16 @@ public class AdminController {
             @RequestBody @Valid AdminReviewBlindRequest request) {
         adminReviewService.blindReview(id, request.getStatus());
         return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
+    }
+
+    @Operation(summary = "장소 목록 조회", description = "장소 목록을 커서 기반 페이지네이션으로 조회합니다. keyword로 이름/주소 검색 가능.")
+    @GetMapping("/places")
+    public ResponseEntity<ApiResponse<AdminPlaceListResponse>> getPlaces(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                adminPlaceService.getPlaces(keyword, cursor, limit)));
     }
 
     @Operation(summary = "사용자 목록 조회", description = "사용자 목록을 커서 기반 페이지네이션으로 조회합니다.")

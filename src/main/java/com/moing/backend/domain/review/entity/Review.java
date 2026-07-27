@@ -88,4 +88,8 @@ public class Review {
     public void unblind() {
         this.isBlinded = false;
     }
+
+    public void updateComment(String comment) {
+        this.comment = comment;
+    }
 }

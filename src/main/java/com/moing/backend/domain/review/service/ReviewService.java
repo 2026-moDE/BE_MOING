@@ -11,6 +11,7 @@ import com.moing.backend.domain.review.dto.ReviewCreateRequest;
 import com.moing.backend.domain.review.dto.ReviewCreateResponse;
 import com.moing.backend.domain.review.dto.ReviewListResponse;
 import com.moing.backend.domain.review.dto.ReviewReportRequest;
+import com.moing.backend.domain.review.dto.ReviewUpdateRequest;
 import com.moing.backend.domain.review.entity.ReviewReport;
 import com.moing.backend.domain.review.repository.ReviewReportRepository;
 import com.moing.backend.domain.review.entity.CongestionLevel;
@@ -58,6 +59,19 @@ public class ReviewService {
         }
 
         reviewRepository.delete(review);
+    }
+
+    // 리뷰 수정
+    @Transactional
+    public void updateReview(Long userId, Long reviewId, ReviewUpdateRequest request) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (!review.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        review.updateComment(request.comment());
     }
 
     // 리뷰 신고

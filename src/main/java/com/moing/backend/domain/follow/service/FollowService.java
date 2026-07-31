@@ -1,0 +1,181 @@
+package com.moing.backend.domain.follow.service;
+
+import com.moing.backend.domain.follow.dto.FriendRequestResponse;
+import com.moing.backend.domain.follow.dto.FriendResponse;
+import com.moing.backend.domain.follow.dto.UserSearchResponse;
+import com.moing.backend.domain.follow.entity.Follow;
+import com.moing.backend.domain.follow.entity.FollowStatus;
+import com.moing.backend.domain.follow.repository.FollowRepository;
+import com.moing.backend.domain.user.entity.User;
+import com.moing.backend.domain.user.repository.UserRepository;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.moing.backend.domain.follow.util.ChosungUtil;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class FollowService {
+
+    private final FollowRepository followRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public void sendFollowRequest(Long followerId, Long followingId) {
+        if (followerId.equals(followingId)) {
+            throw new CustomException(ErrorCode.SELF_FOLLOW_NOT_ALLOWED);
+        }
+
+        userRepository.findById(followingId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        var existing = followRepository.findByFollowerIdAndFollowingId(followerId, followingId);
+        if (existing.isPresent()) {
+            Follow follow = existing.get();
+            if (follow.getStatus() == FollowStatus.PENDING || follow.getStatus() == FollowStatus.ACCEPTED) {
+                throw new CustomException(ErrorCode.ALREADY_FOLLOWING);
+            }
+            // REJECTED → 다시 PENDING으로 변경
+            follow.toPending();
+        } else {
+            Follow follow = Follow.builder()
+                    .followerId(followerId)
+                    .followingId(followingId)
+                    .status(FollowStatus.PENDING)
+                    .build();
+            followRepository.save(follow);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<FriendRequestResponse> getReceivedRequests(Long userId) {
+        List<Follow> follows = followRepository.findByFollowingIdAndStatus(userId, FollowStatus.PENDING);
+
+        List<Long> requesterIds = follows.stream().map(Follow::getFollowerId).toList();
+        Map<Long, User> userMap = userRepository.findAllById(requesterIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return follows.stream().map(f -> {
+            User user = userMap.get(f.getFollowerId());
+            return new FriendRequestResponse(
+                    f.getId(),
+                    user.getId(),
+                    user.getNickname(),
+                    user.getProfileImageUrl(),
+                    f.getCreatedAt()
+            );
+        }).toList();
+    }
+
+    @Transactional
+    public void acceptRequest(Long userId, Long followId) {
+        Follow follow = followRepository.findById(followId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (!follow.getFollowingId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+        if (follow.getStatus() != FollowStatus.PENDING) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        follow.accept();
+
+        // 양방향 친구 관계 생성: 상대방 → 나 방향도 ACCEPTED로 생성
+        var reverseOpt = followRepository.findByFollowerIdAndFollowingId(userId, follow.getFollowerId());
+        if (reverseOpt.isPresent()) {
+            reverseOpt.get().accept();
+        } else {
+            Follow reverse = Follow.builder()
+                    .followerId(userId)
+                    .followingId(follow.getFollowerId())
+                    .status(FollowStatus.ACCEPTED)
+                    .build();
+            followRepository.save(reverse);
+        }
+    }
+
+    @Transactional
+    public void rejectRequest(Long userId, Long followId) {
+        Follow follow = followRepository.findById(followId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (!follow.getFollowingId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+        if (follow.getStatus() != FollowStatus.PENDING) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        follow.reject();
+    }
+
+    @Transactional
+    public void cancelFollow(Long followerId, Long followingId) {
+        Follow follow = followRepository.findByFollowerIdAndFollowingId(followerId, followingId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        followRepository.delete(follow);
+
+        // 양방향 관계도 삭제
+        followRepository.findByFollowerIdAndFollowingId(followingId, followerId)
+                .ifPresent(followRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserSearchResponse> searchByNickname(Long userId, String nickname) {
+        if (nickname == null || nickname.isBlank()) {
+            return List.of();
+        }
+
+        List<User> users;
+        if (ChosungUtil.hasChosung(nickname)) {
+            String pattern = ChosungUtil.toRegexPattern(nickname);
+            users = userRepository.findByNicknameRegex(pattern);
+        } else {
+            users = userRepository.findByNicknameContaining(nickname);
+        }
+
+        // 자기 자신 제외
+        users = users.stream().filter(u -> !u.getId().equals(userId)).toList();
+
+        if (users.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> targetIds = users.stream().map(User::getId).toList();
+        List<Follow> follows = followRepository.findByFollowerIdAndFollowingIdIn(userId, targetIds);
+        Map<Long, FollowStatus> statusMap = follows.stream()
+                .collect(Collectors.toMap(Follow::getFollowingId, Follow::getStatus));
+
+        return users.stream().map(u -> new UserSearchResponse(
+                u.getId(),
+                u.getNickname(),
+                u.getProfileImageUrl(),
+                statusMap.containsKey(u.getId()) ? statusMap.get(u.getId()).name() : "NONE"
+        )).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<FriendResponse> getFriends(Long userId) {
+        List<Follow> follows = followRepository.findByFollowerIdAndStatus(userId, FollowStatus.ACCEPTED);
+
+        List<Long> friendIds = follows.stream().map(Follow::getFollowingId).toList();
+        Map<Long, User> userMap = userRepository.findAllById(friendIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return follows.stream()
+                .filter(f -> userMap.containsKey(f.getFollowingId()))
+                .map(f -> {
+                    User user = userMap.get(f.getFollowingId());
+                    return new FriendResponse(user.getId(), user.getNickname(), user.getProfileImageUrl());
+                }).toList();
+    }
+}

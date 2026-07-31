@@ -19,6 +19,8 @@ public record ReviewListResponse(
     public record ReviewItem(
             Long id,
             @JsonProperty("image_url") String imageUrl,
+            @JsonProperty("thumbnail_url") String thumbnailUrl,
+            @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl,
             @JsonProperty("congestion_level") CongestionLevel congestionLevel,
             String comment,
             @JsonProperty("helpful_count") int helpfulCount,

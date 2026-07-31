@@ -41,6 +41,12 @@ public class Review {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "thumbnail_url", length = 500)
+    private String thumbnailUrl;
+
+    @Column(name = "thumbnail_small_url", length = 500)
+    private String thumbnailSmallUrl;
+
     @Column(name = "latitude", precision = 10, scale = 7)
     private BigDecimal latitude;
 
@@ -73,12 +79,21 @@ public class Review {
         this.quickTag = quickTag;
         this.comment = comment;
         this.imageUrl = imageUrl;
+        this.thumbnailUrl = generateThumbnailUrl(imageUrl, "thumbnail");
+        this.thumbnailSmallUrl = generateThumbnailUrl(imageUrl, "thumbnail_small");
         this.latitude = latitude;
         this.longitude = longitude;
         this.status = "ACTIVE";
         this.helpfulCount = 0;
         this.viewCount = 0;
         this.isBlinded = false;
+    }
+
+    private static String generateThumbnailUrl(String imageUrl, String folder) {
+        if (imageUrl == null || !imageUrl.contains("/original/")) {
+            return null;
+        }
+        return imageUrl.replace("/original/", "/" + folder + "/");
     }
 
     public void blind() {

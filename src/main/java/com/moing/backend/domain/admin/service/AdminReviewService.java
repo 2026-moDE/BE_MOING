@@ -52,6 +52,8 @@ public class AdminReviewService {
                     ((Number) row[0]).longValue(),
                     (String) row[1],       // place_name (nullable)
                     (String) row[2],       // image_url
+                    (String) row[9],       // thumbnail_url
+                    (String) row[10],      // thumbnail_small_url
                     (String) row[3],       // congestion_level
                     (String) row[4],       // comment
                     nickname,

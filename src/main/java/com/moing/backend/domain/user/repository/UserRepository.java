@@ -29,6 +29,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 활성 유저 수
     long countByDeletedAtIsNull();
 
+    // 닉네임 검색 (부분 일치)
+    List<User> findByNicknameContaining(String nickname);
+
+    // 닉네임 초성 검색 (PostgreSQL 정규식)
+    @Query(value = "SELECT * FROM users WHERE deleted_at IS NULL AND nickname ~ :pattern", nativeQuery = true)
+    List<User> findByNicknameRegex(@Param("pattern") String pattern);
+
     // 관리자 사용자 목록 (review_count 포함, N+1 방지)
     @Query(value = """
             SELECT u.id, u.nickname, u.email, u.profile_image_url,

@@ -26,6 +26,10 @@ public enum ErrorCode {
     // --- 유저 조회 관련 ---
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),
 
+    // --- 친구 관련 ---
+    SELF_FOLLOW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신에게 친구 요청을 보낼 수 없습니다"),
+    ALREADY_FOLLOWING(HttpStatus.CONFLICT, "이미 친구 요청 중이거나 친구 상태입니다"),
+
     // --- 관리자 관련 ---
     ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");
 

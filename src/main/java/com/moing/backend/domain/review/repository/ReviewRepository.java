@@ -168,7 +168,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query(value = """
             SELECT r.id, p.name AS place_name, r.image_url, r.congestion_level,
                    r.comment, u.nickname AS author_nickname,
-                   r.is_blinded, r.status, r.created_at
+                   r.is_blinded, r.status, r.created_at,
+                   r.thumbnail_url, r.thumbnail_small_url
             FROM reviews r
             LEFT JOIN places p ON p.id = r.place_id
             LEFT JOIN users u ON u.id = r.user_id

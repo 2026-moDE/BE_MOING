@@ -231,8 +231,8 @@ public class ReviewService {
                     Boolean isHelpful = includeIsHelpful ? finalHelpfulIds.contains(r.getId()) : null;
                     boolean isMine = userId != null && userId.equals(r.getUserId());
                     return new ReviewListResponse.ReviewItem(
-                            r.getId(), r.getImageUrl(), r.getCongestionLevel(),
-                            r.getComment(), r.getHelpfulCount(), isHelpful, isMine,
+                            r.getId(), r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
+                            r.getCongestionLevel(), r.getComment(), r.getHelpfulCount(), isHelpful, isMine,
                             userInfo, r.getCreatedAt()
                     );
                 })

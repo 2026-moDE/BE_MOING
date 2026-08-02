@@ -69,7 +69,6 @@ public class PlaceService {
             Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
             List<PlaceNearbyResponse.PlaceItem> items = places.stream()
                     .map(place -> toItem(place, filter, since, cacheMap.get(place.getId())))
-                    .filter(item -> item.thumbnailUrl() != null)
                     .toList();
             return new PlaceNearbyResponse(items);
         }
@@ -130,7 +129,7 @@ public class PlaceService {
         }
 
         // DB에 없으면 네이버 정보만 반환
-        return new PlaceNearbyResponse.PlaceItem(null, name, itemLat, itemLng, null, null, null, null);
+        return new PlaceNearbyResponse.PlaceItem(null, name, itemLat, itemLng, null, null, null, null, null);
     }
 
     // placeId 목록으로 혼잡도 캐시를 한 번에 로드
@@ -157,13 +156,22 @@ public class PlaceService {
                     .stream().findFirst().map(Review::getImageUrl).orElse(null);
         };
 
+        String imageUrl = (String) thumbnailUrl;
+        String convertedThumbnailUrl = (imageUrl != null && imageUrl.contains("original/"))
+                ? imageUrl.replace("original/", "thumbnail/")
+                : imageUrl;
+        String thumbnailSmallUrl = (imageUrl != null && imageUrl.contains("original/"))
+                ? imageUrl.replace("original/", "thumbnail_small/")
+                : null;
+
         return new PlaceNearbyResponse.PlaceItem(
                 place.getId(),
                 place.getName(),
                 place.getLatitude().doubleValue(),
                 place.getLongitude().doubleValue(),
                 congestionLevel,
-                thumbnailUrl,
+                convertedThumbnailUrl,
+                thumbnailSmallUrl,
                 place.getCategory(),
                 place.getAddress()
         );

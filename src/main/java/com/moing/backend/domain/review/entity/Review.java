@@ -50,6 +50,9 @@ public class Review {
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
+    @Column(name = "is_blinded", nullable = false)
+    private boolean isBlinded;
+
     @Column(name = "helpful_count", nullable = false)
     private int helpfulCount;
 
@@ -73,6 +76,7 @@ public class Review {
         this.latitude = latitude;
         this.longitude = longitude;
         this.status = "ACTIVE";
+        this.isBlinded = false;
         this.helpfulCount = 0;
         this.viewCount = 0;
     }

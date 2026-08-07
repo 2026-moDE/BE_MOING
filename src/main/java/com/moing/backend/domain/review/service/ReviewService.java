@@ -1,6 +1,7 @@
 package com.moing.backend.domain.review.service;
 
 import com.moing.backend.domain.notification.entity.Notification;
+import com.moing.backend.domain.notification.entity.NotificationType;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.entity.PlaceSubscription;
@@ -139,6 +140,7 @@ public class ReviewService {
             notificationRepository.save(Notification.builder()
                     .userId(subscriber.getId())
                     .placeId(placeId)
+                    .type(NotificationType.REVIEW)
                     .title(title)
                     .body(body)
                     .build());

@@ -11,6 +11,9 @@ import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,8 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+
+    private static final int SEARCH_LIMIT = 20;
 
     @Transactional
     public void sendFollowRequest(Long followerId, Long followingId) {
@@ -50,7 +55,12 @@ public class FollowService {
                     .followingId(followingId)
                     .status(FollowStatus.PENDING)
                     .build();
-            followRepository.save(follow);
+            try {
+                // 동시 중복 요청 시 unique constraint 위반을 409로 변환
+                followRepository.saveAndFlush(follow);
+            } catch (DataIntegrityViolationException e) {
+                throw new CustomException(ErrorCode.ALREADY_FOLLOWING);
+            }
         }
     }
 
@@ -62,10 +72,11 @@ public class FollowService {
         Map<Long, User> userMap = userRepository.findAllById(requesterIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        return follows.stream().map(f -> {
+        return follows.stream()
+                .filter(f -> userMap.containsKey(f.getFollowerId())) // 탈퇴한 유저의 요청 제외
+                .map(f -> {
             User user = userMap.get(f.getFollowerId());
             return new FriendRequestResponse(
-                    f.getId(),
                     user.getId(),
                     user.getNickname(),
                     user.getProfileImageUrl(),
@@ -75,27 +86,24 @@ public class FollowService {
     }
 
     @Transactional
-    public void acceptRequest(Long userId, Long followId) {
-        Follow follow = followRepository.findById(followId)
+    public void acceptRequest(Long myId, Long requesterId) {
+        Follow follow = followRepository.findByFollowerIdAndFollowingId(requesterId, myId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
-        if (!follow.getFollowingId().equals(userId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
         if (follow.getStatus() != FollowStatus.PENDING) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
         follow.accept();
 
-        // 양방향 친구 관계 생성: 상대방 → 나 방향도 ACCEPTED로 생성
-        var reverseOpt = followRepository.findByFollowerIdAndFollowingId(userId, follow.getFollowerId());
+        // 양방향 친구 관계 생성: 나 → 상대방 방향도 ACCEPTED로 생성
+        var reverseOpt = followRepository.findByFollowerIdAndFollowingId(myId, requesterId);
         if (reverseOpt.isPresent()) {
             reverseOpt.get().accept();
         } else {
             Follow reverse = Follow.builder()
-                    .followerId(userId)
-                    .followingId(follow.getFollowerId())
+                    .followerId(myId)
+                    .followingId(requesterId)
                     .status(FollowStatus.ACCEPTED)
                     .build();
             followRepository.save(reverse);
@@ -103,13 +111,10 @@ public class FollowService {
     }
 
     @Transactional
-    public void rejectRequest(Long userId, Long followId) {
-        Follow follow = followRepository.findById(followId)
+    public void rejectRequest(Long myId, Long requesterId) {
+        Follow follow = followRepository.findByFollowerIdAndFollowingId(requesterId, myId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
-        if (!follow.getFollowingId().equals(userId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
         if (follow.getStatus() != FollowStatus.PENDING) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
@@ -124,8 +129,9 @@ public class FollowService {
 
         followRepository.delete(follow);
 
-        // 양방향 관계도 삭제
+        // 양방향 관계도 삭제 (상대방이 나에게 보낸 별개의 PENDING 요청은 유지)
         followRepository.findByFollowerIdAndFollowingId(followingId, followerId)
+                .filter(reverse -> reverse.getStatus() == FollowStatus.ACCEPTED)
                 .ifPresent(followRepository::delete);
     }
 
@@ -135,12 +141,13 @@ public class FollowService {
             return List.of();
         }
 
+        Pageable limit = PageRequest.of(0, SEARCH_LIMIT);
         List<User> users;
         if (ChosungUtil.hasChosung(nickname)) {
             String pattern = ChosungUtil.toRegexPattern(nickname);
-            users = userRepository.findByNicknameRegex(pattern);
+            users = userRepository.findByNicknameRegex(pattern, limit);
         } else {
-            users = userRepository.findByNicknameContaining(nickname);
+            users = userRepository.findByNicknameContaining(nickname, limit);
         }
 
         // 자기 자신 제외
@@ -155,12 +162,18 @@ public class FollowService {
         Map<Long, FollowStatus> statusMap = follows.stream()
                 .collect(Collectors.toMap(Follow::getFollowingId, Follow::getStatus));
 
-        return users.stream().map(u -> new UserSearchResponse(
-                u.getId(),
-                u.getNickname(),
-                u.getProfileImageUrl(),
-                statusMap.containsKey(u.getId()) ? statusMap.get(u.getId()).name() : "NONE"
-        )).toList();
+        return users.stream().map(u -> {
+            // REJECTED는 거절 사실을 숨기고 재요청 가능하도록 NONE으로 노출
+            FollowStatus status = statusMap.get(u.getId());
+            String relationStatus = (status == null || status == FollowStatus.REJECTED)
+                    ? "NONE" : status.name();
+            return new UserSearchResponse(
+                    u.getId(),
+                    u.getNickname(),
+                    u.getProfileImageUrl(),
+                    relationStatus
+            );
+        }).toList();
     }
 
     @Transactional(readOnly = true)

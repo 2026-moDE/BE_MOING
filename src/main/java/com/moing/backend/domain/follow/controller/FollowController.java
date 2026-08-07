@@ -37,21 +37,21 @@ public class FollowController {
         return ResponseEntity.ok(ApiResponse.success(followService.getReceivedRequests(userId)));
     }
 
-    @PatchMapping("/requests/{id}/accept")
+    @PatchMapping("/requests/{userId}/accept")
     public ResponseEntity<ApiResponse<Void>> acceptRequest(
-            @AuthenticationPrincipal Long userId,
-            @PathVariable Long id
+            @AuthenticationPrincipal Long myId,
+            @PathVariable Long userId
     ) {
-        followService.acceptRequest(userId, id);
+        followService.acceptRequest(myId, userId);
         return ResponseEntity.ok(ApiResponse.success("친구 요청을 수락했습니다", null));
     }
 
-    @PatchMapping("/requests/{id}/reject")
+    @PatchMapping("/requests/{userId}/reject")
     public ResponseEntity<ApiResponse<Void>> rejectRequest(
-            @AuthenticationPrincipal Long userId,
-            @PathVariable Long id
+            @AuthenticationPrincipal Long myId,
+            @PathVariable Long userId
     ) {
-        followService.rejectRequest(userId, id);
+        followService.rejectRequest(myId, userId);
         return ResponseEntity.ok(ApiResponse.success("친구 요청을 거절했습니다", null));
     }
 

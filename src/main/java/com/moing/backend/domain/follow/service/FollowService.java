@@ -65,7 +65,6 @@ public class FollowService {
         return follows.stream().map(f -> {
             User user = userMap.get(f.getFollowerId());
             return new FriendRequestResponse(
-                    f.getId(),
                     user.getId(),
                     user.getNickname(),
                     user.getProfileImageUrl(),
@@ -75,27 +74,24 @@ public class FollowService {
     }
 
     @Transactional
-    public void acceptRequest(Long userId, Long followId) {
-        Follow follow = followRepository.findById(followId)
+    public void acceptRequest(Long myId, Long requesterId) {
+        Follow follow = followRepository.findByFollowerIdAndFollowingId(requesterId, myId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
-        if (!follow.getFollowingId().equals(userId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
         if (follow.getStatus() != FollowStatus.PENDING) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
         follow.accept();
 
-        // 양방향 친구 관계 생성: 상대방 → 나 방향도 ACCEPTED로 생성
-        var reverseOpt = followRepository.findByFollowerIdAndFollowingId(userId, follow.getFollowerId());
+        // 양방향 친구 관계 생성: 나 → 상대방 방향도 ACCEPTED로 생성
+        var reverseOpt = followRepository.findByFollowerIdAndFollowingId(myId, requesterId);
         if (reverseOpt.isPresent()) {
             reverseOpt.get().accept();
         } else {
             Follow reverse = Follow.builder()
-                    .followerId(userId)
-                    .followingId(follow.getFollowerId())
+                    .followerId(myId)
+                    .followingId(requesterId)
                     .status(FollowStatus.ACCEPTED)
                     .build();
             followRepository.save(reverse);
@@ -103,13 +99,10 @@ public class FollowService {
     }
 
     @Transactional
-    public void rejectRequest(Long userId, Long followId) {
-        Follow follow = followRepository.findById(followId)
+    public void rejectRequest(Long myId, Long requesterId) {
+        Follow follow = followRepository.findByFollowerIdAndFollowingId(requesterId, myId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
 
-        if (!follow.getFollowingId().equals(userId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
         if (follow.getStatus() != FollowStatus.PENDING) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }

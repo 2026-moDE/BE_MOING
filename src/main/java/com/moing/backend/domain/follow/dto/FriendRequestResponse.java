@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 public class FriendRequestResponse {
-    private Long followId;
     private Long userId;
     private String nickname;
     private String profileImageUrl;

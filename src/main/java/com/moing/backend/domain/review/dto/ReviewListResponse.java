@@ -13,7 +13,8 @@ public record ReviewListResponse(
 ) {
     public record UserInfo(
             String nickname,
-            @JsonProperty("profile_image_url") String profileImageUrl
+            @JsonProperty("profile_image_url") String profileImageUrl,
+            @JsonProperty("profile_url") String profileUrl
     ) {}
 
     public record ReviewItem(

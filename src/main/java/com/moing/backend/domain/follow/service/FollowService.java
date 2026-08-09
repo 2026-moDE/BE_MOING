@@ -92,6 +92,7 @@ public class FollowService {
                     user.getId(),
                     user.getNickname(),
                     user.getProfileImageUrl(),
+                    user.getProfileUrl(),
                     f.getCreatedAt()
             );
         }).toList();
@@ -204,6 +205,7 @@ public class FollowService {
                     u.getId(),
                     u.getNickname(),
                     u.getProfileImageUrl(),
+                    u.getProfileUrl(),
                     relationStatus
             );
         }).toList();
@@ -221,7 +223,7 @@ public class FollowService {
                 .filter(f -> userMap.containsKey(f.getFollowingId()))
                 .map(f -> {
                     User user = userMap.get(f.getFollowingId());
-                    return new FriendResponse(user.getId(), user.getNickname(), user.getProfileImageUrl());
+                    return new FriendResponse(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl());
                 }).toList();
     }
 }

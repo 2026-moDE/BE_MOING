@@ -12,6 +12,8 @@ public class UserSearchResponse {
     private String nickname;
     @JsonProperty("profile_image_url")
     private String profileImageUrl;
+    @JsonProperty("profile_url")
+    private String profileUrl;
     @JsonProperty("friend_status")
     private String friendStatus; // NONE, PENDING, ACCEPTED
 }

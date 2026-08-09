@@ -105,7 +105,8 @@ public class ReviewService {
                 .congestionLevel(request.congestionLevel())
                 .quickTag(request.quickTag())
                 .comment(request.comment())
-                .imageUrl(request.imageUrl())
+                // 빈 문자열은 null로 정규화 (프론트 폴백 체인이 null 기준으로 동작)
+                .imageUrl(request.imageUrl() != null && !request.imageUrl().isBlank() ? request.imageUrl() : null)
                 .latitude(request.latitude())
                 .longitude(request.longitude())
                 .build();
@@ -228,8 +229,8 @@ public class ReviewService {
                 .map(r -> {
                     User user = userMap.get(r.getUserId());
                     ReviewListResponse.UserInfo userInfo = user != null
-                            ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl())
-                            : new ReviewListResponse.UserInfo("알 수 없음", null);
+                            ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
+                            : new ReviewListResponse.UserInfo("알 수 없음", null, null);
                     Boolean isHelpful = includeIsHelpful ? finalHelpfulIds.contains(r.getId()) : null;
                     boolean isMine = userId != null && userId.equals(r.getUserId());
                     return new ReviewListResponse.ReviewItem(

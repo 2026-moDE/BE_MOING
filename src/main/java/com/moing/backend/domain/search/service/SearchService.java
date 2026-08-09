@@ -147,7 +147,7 @@ public class SearchService {
                 .source("KAKAO")
                 .build());
 
-        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null);
+        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null, null);
     }
 
     private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {
@@ -156,11 +156,9 @@ public class SearchService {
                 .map(Review::getCongestionLevel)
                 .orElse(null);
 
-        var thumbnailUrl = reviewRepository
+        var topReview = reviewRepository
                 .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
-                .stream().findFirst()
-                .map(Review::getImageUrl)
-                .orElse(null);
+                .stream().findFirst();
 
         return new PlaceSearchResponse.PlaceItem(
                 place.getId(),
@@ -170,7 +168,9 @@ public class SearchService {
                 place.getLatitude().doubleValue(),
                 place.getLongitude().doubleValue(),
                 congestionLevel,
-                thumbnailUrl
+                // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 원본으로 폴백
+                topReview.map(r -> r.getThumbnailUrl() != null ? r.getThumbnailUrl() : r.getImageUrl()).orElse(null),
+                topReview.map(Review::getThumbnailSmallUrl).orElse(null)
         );
     }
 }

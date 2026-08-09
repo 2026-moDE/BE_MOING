@@ -15,6 +15,8 @@ public class FriendRequestResponse {
     private String nickname;
     @JsonProperty("profile_image_url")
     private String profileImageUrl;
+    @JsonProperty("profile_url")
+    private String profileUrl;
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
     @JsonProperty("created_at")
     private LocalDateTime createdAt;

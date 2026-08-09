@@ -12,4 +12,6 @@ public class FriendResponse {
     private String nickname;
     @JsonProperty("profile_image_url")
     private String profileImageUrl;
+    @JsonProperty("profile_url")
+    private String profileUrl;
 }

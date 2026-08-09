@@ -1,5 +1,6 @@
 package com.moing.backend.domain.user.service;
 
+import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.Notification;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.place.entity.Place;
@@ -37,6 +38,7 @@ public class UserService {
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
     private final PlaceRepository placeRepository;
     private final NotificationRepository notificationRepository;
+    private final FollowRepository followRepository;
 
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -45,6 +47,7 @@ public class UserService {
         long reviewCount = reviewRepository.countByUserId(userId);
         long placeCount = reviewRepository.countDistinctPlaceIdByUserId(userId);
         long subscriptionCount = placeSubscriptionRepository.countByUserId(userId);
+        long friendCount = followRepository.countFriends(userId);
 
         return new UserProfileResponse(
                 user.getId(),
@@ -53,7 +56,8 @@ public class UserService {
                 user.getProfileImageUrl(),
                 reviewCount,
                 placeCount,
-                subscriptionCount
+                subscriptionCount,
+                friendCount
         );
     }
 
@@ -110,7 +114,9 @@ public class UserService {
                 }
             }
             return new NotificationListResponse.NotificationItem(
-                    n.getId(), n.getTitle(), n.getBody(), placeInfo,
+                    n.getId(),
+                    n.getType() != null ? n.getType().name() : null,
+                    n.getTitle(), n.getBody(), placeInfo,
                     n.isRead(), n.getCreatedAt());
         }).toList();
 

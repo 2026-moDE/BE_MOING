@@ -107,6 +107,15 @@ public class User {
         this.profileImageUrl = profileImageUrl;
     }
 
+    // 리사이즈된 프로필 이미지 URL (Lambda가 profile_original/ → profile/에 생성)
+    // 리사이즈 대상이 아닌 옛 이미지는 원본으로 폴백
+    public String getProfileUrl() {
+        if (profileImageUrl == null || !profileImageUrl.contains("/profile_original/")) {
+            return profileImageUrl;
+        }
+        return profileImageUrl.replace("/profile_original/", "/profile/");
+    }
+
     // 탈퇴 후 재가입 시 계정 복구 (deleted_at 초기화 및 약관 동의 초기화)
     public void restore(String fcmToken) {
         this.deletedAt = null;

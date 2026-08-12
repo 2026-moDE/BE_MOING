@@ -277,7 +277,8 @@ public class PlaceService {
 
         PlaceCongestionCache cache = congestionCacheRepository.findById(placeId).orElse(null);
 
-        long reviewCount = reviewRepository.countByPlaceIdAndIsBlindedFalseAndCreatedAtAfter(placeId, since);
+        // 목록에 실제로 보이는 리뷰만 센다 (친구 공개 리뷰는 작성자 본인과 친구에게만)
+        long reviewCount = reviewRepository.countVisibleCurrentReviews(placeId, since, userId);
 
         return new PlaceDetailResponse(
                 place.getId(),

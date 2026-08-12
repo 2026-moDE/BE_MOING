@@ -27,6 +27,10 @@ public class Notification {
     @Column(name = "place_id")
     private Long placeId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", length = 30)
+    private NotificationType type;
+
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
@@ -41,9 +45,10 @@ public class Notification {
     private LocalDateTime createdAt;
 
     @Builder
-    public Notification(Long userId, Long placeId, String title, String body) {
+    public Notification(Long userId, Long placeId, NotificationType type, String title, String body) {
         this.userId = userId;
         this.placeId = placeId;
+        this.type = type;
         this.title = title;
         this.body = body;
         this.isRead = false;

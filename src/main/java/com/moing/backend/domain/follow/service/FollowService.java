@@ -6,10 +6,14 @@ import com.moing.backend.domain.follow.dto.UserSearchResponse;
 import com.moing.backend.domain.follow.entity.Follow;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
+import com.moing.backend.domain.notification.entity.Notification;
+import com.moing.backend.domain.notification.entity.NotificationType;
+import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
+import com.moing.backend.global.infra.FcmService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -29,6 +33,8 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+    private final FcmService fcmService;
 
     private static final int SEARCH_LIMIT = 20;
 
@@ -38,7 +44,7 @@ public class FollowService {
             throw new CustomException(ErrorCode.SELF_FOLLOW_NOT_ALLOWED);
         }
 
-        userRepository.findById(followingId)
+        User target = userRepository.findById(followingId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         var existing = followRepository.findByFollowerIdAndFollowingId(followerId, followingId);
@@ -62,6 +68,12 @@ public class FollowService {
                 throw new CustomException(ErrorCode.ALREADY_FOLLOWING);
             }
         }
+
+        User requester = userRepository.findById(followerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        sendFriendNotification(target, NotificationType.FRIEND_REQUEST,
+                "새로운 친구 요청이 도착했어요!",
+                requester.getNickname() + "님이 친구 요청을 보냈어요");
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +92,7 @@ public class FollowService {
                     user.getId(),
                     user.getNickname(),
                     user.getProfileImageUrl(),
+                    user.getProfileUrl(),
                     f.getCreatedAt()
             );
         }).toList();
@@ -107,6 +120,27 @@ public class FollowService {
                     .status(FollowStatus.ACCEPTED)
                     .build();
             followRepository.save(reverse);
+        }
+
+        // 요청 보낸 사람에게 수락 알림 (탈퇴한 유저면 생략)
+        User me = userRepository.findById(myId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        userRepository.findById(requesterId).ifPresent(requester ->
+                sendFriendNotification(requester, NotificationType.FRIEND_ACCEPT,
+                        "친구 요청이 수락됐어요!",
+                        me.getNickname() + "님과 친구가 되었어요"));
+    }
+
+    private void sendFriendNotification(User target, NotificationType type, String title, String body) {
+        notificationRepository.save(Notification.builder()
+                .userId(target.getId())
+                .type(type)
+                .title(title)
+                .body(body)
+                .build());
+
+        if (target.getFcmToken() != null) {
+            fcmService.sendNotification(target.getFcmToken(), title, body);
         }
     }
 
@@ -171,6 +205,7 @@ public class FollowService {
                     u.getId(),
                     u.getNickname(),
                     u.getProfileImageUrl(),
+                    u.getProfileUrl(),
                     relationStatus
             );
         }).toList();
@@ -188,7 +223,7 @@ public class FollowService {
                 .filter(f -> userMap.containsKey(f.getFollowingId()))
                 .map(f -> {
                     User user = userMap.get(f.getFollowingId());
-                    return new FriendResponse(user.getId(), user.getNickname(), user.getProfileImageUrl());
+                    return new FriendResponse(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl());
                 }).toList();
     }
 }

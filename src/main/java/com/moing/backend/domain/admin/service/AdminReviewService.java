@@ -2,6 +2,7 @@ package com.moing.backend.domain.admin.service;
 
 import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
 import com.moing.backend.domain.review.entity.Review;
+import com.moing.backend.domain.place.service.CongestionCacheService;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -22,6 +23,7 @@ public class AdminReviewService {
     private static final Set<String> VALID_STATUSES = Set.of("ACTIVE", "ARCHIVED", "BLINDED");
 
     private final ReviewRepository reviewRepository;
+    private final CongestionCacheService congestionCacheService;
 
     public AdminReviewListResponse getReviews(String status, Long cursor, Integer limit) {
         if (limit == null) limit = 20;
@@ -80,5 +82,8 @@ public class AdminReviewService {
         } else {
             review.unblind();
         }
+
+        // 블라인드 여부가 혼잡도 집계 대상을 바꾸므로 즉시 갱신한다
+        congestionCacheService.refreshForPlace(review.getPlaceId());
     }
 }

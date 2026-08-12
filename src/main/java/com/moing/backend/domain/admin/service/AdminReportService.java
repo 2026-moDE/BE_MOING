@@ -4,6 +4,7 @@ import com.moing.backend.domain.admin.dto.AdminReportListResponse;
 import com.moing.backend.domain.review.entity.ReportStatus;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.entity.ReviewReport;
+import com.moing.backend.domain.place.service.CongestionCacheService;
 import com.moing.backend.domain.review.repository.ReviewReportRepository;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.user.entity.User;
@@ -30,6 +31,7 @@ public class AdminReportService {
 
     private final ReviewReportRepository reviewReportRepository;
     private final ReviewRepository reviewRepository;
+    private final CongestionCacheService congestionCacheService;
     private final UserRepository userRepository;
 
     public AdminReportListResponse getReports(String status, Long cursor, Integer limit) {
@@ -115,7 +117,11 @@ public class AdminReportService {
             report.process(ReportStatus.RESOLVED, adminId);
 
             reviewRepository.findById(report.getReviewId())
-                    .ifPresent(Review::blind);
+                    .ifPresent(review -> {
+                        review.blind();
+                        // 블라인드된 리뷰가 혼잡도에 남지 않도록 즉시 갱신한다
+                        congestionCacheService.refreshForPlace(review.getPlaceId());
+                    });
         }
     }
 }

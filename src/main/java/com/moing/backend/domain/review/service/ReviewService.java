@@ -111,7 +111,12 @@ public class ReviewService {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
+        Long placeId = review.getPlaceId();
         reviewRepository.delete(review);
+
+        // 지운 리뷰가 혼잡도에 남지 않도록 즉시 갱신한다.
+        // 마지막 리뷰였다면 refreshForPlace가 캐시 행 자체를 지운다.
+        congestionCacheService.refreshForPlace(placeId);
     }
 
     // 리뷰 수정

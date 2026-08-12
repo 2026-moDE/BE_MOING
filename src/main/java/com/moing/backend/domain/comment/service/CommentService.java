@@ -34,11 +34,16 @@ public class CommentService {
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
 
-    // 댓글 작성
+    // 댓글 작성 (비밀 댓글은 친구 공개 리뷰에서만 가능)
     @Transactional
     public CommentCreateResponse createComment(Long userId, Long reviewId, CommentCreateRequest request) {
         Review review = getReview(reviewId);
         validateAccess(userId, review);
+
+        boolean isSecret = request.isSecret() != null && request.isSecret();
+        if (isSecret && !isFriendsOnly(review)) {
+            throw new CustomException(ErrorCode.SECRET_COMMENT_NOT_ALLOWED);
+        }
 
         Comment comment = commentRepository.save(Comment.builder()
                 .reviewId(reviewId)
@@ -50,14 +55,10 @@ public class CommentService {
         return CommentCreateResponse.from(comment);
     }
 
-    // 답글 작성 (친구 공개 리뷰에서만 가능)
+    // 답글 작성 (공개 범위와 무관하게 가능)
     @Transactional
     public CommentCreateResponse createReply(Long userId, Long reviewId, Long commentId, ReplyCreateRequest request) {
         Review review = getReview(reviewId);
-
-        if (!isFriendsOnly(review)) {
-            throw new CustomException(ErrorCode.REPLY_NOT_ALLOWED);
-        }
         validateAccess(userId, review);
 
         Comment parent = commentRepository.findById(commentId)
@@ -106,21 +107,18 @@ public class CommentService {
     @Transactional(readOnly = true)
     public CommentListResponse getComments(Long userId, Long reviewId, Long cursor, int limit) {
         Review review = getReview(reviewId);
-        boolean friendsOnly = isFriendsOnly(review);
 
-        // 친구 공개 리뷰의 댓글은 친구에게만 보여준다
-        if (friendsOnly) {
-            validateAccess(userId, review);
-        }
+        // 친구 공개 리뷰의 댓글은 친구에게만 보여준다 (전체 공개면 그대로 통과)
+        validateAccess(userId, review);
 
         List<Comment> fetched = commentRepository.findTopLevelComments(
                 reviewId, cursor, PageRequest.of(0, limit + 1));
         boolean hasNext = fetched.size() > limit;
         List<Comment> page = hasNext ? fetched.subList(0, limit) : fetched;
 
-        // 답글은 친구 공개 리뷰에서만 함께 내려준다
+        // 답글은 공개 범위와 무관하게 함께 내려준다
         Map<Long, List<Comment>> repliesByParent = Map.of();
-        if (friendsOnly && !page.isEmpty()) {
+        if (!page.isEmpty()) {
             List<Long> parentIds = page.stream().map(Comment::getId).toList();
             repliesByParent = commentRepository.findRepliesByParentIds(parentIds).stream()
                     .collect(Collectors.groupingBy(Comment::getParentId));
@@ -131,11 +129,9 @@ public class CommentService {
         final Map<Long, List<Comment>> replies = repliesByParent;
         List<CommentListResponse.CommentItem> items = page.stream()
                 .map(c -> toItem(c, userId, review.getUserId(), userMap,
-                        friendsOnly
-                                ? replies.getOrDefault(c.getId(), List.of()).stream()
-                                        .map(r -> toItem(r, userId, review.getUserId(), userMap, null))
-                                        .toList()
-                                : null))
+                        replies.getOrDefault(c.getId(), List.of()).stream()
+                                .map(r -> toItem(r, userId, review.getUserId(), userMap, null))
+                                .toList()))
                 .toList();
 
         Long nextCursor = hasNext ? page.get(page.size() - 1).getId() : null;

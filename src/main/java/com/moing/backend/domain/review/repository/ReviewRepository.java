@@ -63,7 +63,25 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             Pageable pageable);
 
     // 72h 이내 리뷰 수 (상세 조회용)
-    long countByPlaceIdAndIsBlindedFalseAndCreatedAtAfter(Long placeId, LocalDateTime since);
+    // 조회자에게 실제로 보이는 리뷰만 센다. 조건은 findCurrentReviews와 동일해야
+    // 목록에 뜨는 개수와 상세의 review_count가 어긋나지 않는다.
+    @Query("""
+            SELECT COUNT(r) FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt > :since
+              AND r.isBlinded = false
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS
+                   OR r.userId = :viewerId
+                   OR EXISTS (SELECT f.id FROM Follow f
+                              WHERE f.followerId = :viewerId
+                                AND f.followingId = r.userId
+                                AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
+            """)
+    long countVisibleCurrentReviews(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            @Param("viewerId") Long viewerId);
 
     // 72h 이내 커서 기반 조회 (현재 리뷰, 친구 공개 리뷰는 작성자 본인과 친구에게만)
     @Query("""

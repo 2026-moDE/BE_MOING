@@ -27,7 +27,7 @@ public record CommentListResponse(
             UserInfo user,
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
             @JsonProperty("created_at") LocalDateTime createdAt,
-            // 친구 공개 리뷰에서만 내려간다. 전체 공개 리뷰는 null
+            // 최상위 댓글이면 답글 목록(없으면 빈 배열), 답글 자신이면 null
             List<CommentItem> replies
     ) {}
 }

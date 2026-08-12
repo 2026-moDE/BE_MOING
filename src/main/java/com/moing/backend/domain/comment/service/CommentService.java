@@ -157,8 +157,8 @@ public class CommentService {
                                                    List<CommentListResponse.CommentItem> replies) {
         User author = userMap.get(comment.getUserId());
         CommentListResponse.UserInfo userInfo = author != null
-                ? new CommentListResponse.UserInfo(author.getNickname(), author.getProfileImageUrl())
-                : new CommentListResponse.UserInfo("알 수 없음", null);
+                ? new CommentListResponse.UserInfo(author.getNickname(), author.getProfileImageUrl(), author.getProfileUrl())
+                : new CommentListResponse.UserInfo("알 수 없음", null, null);
 
         boolean isMine = viewerId.equals(comment.getUserId());
 

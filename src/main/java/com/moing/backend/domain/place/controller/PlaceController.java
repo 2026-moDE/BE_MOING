@@ -3,6 +3,7 @@ package com.moing.backend.domain.place.controller;
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.dto.RegionResponse;
 import com.moing.backend.domain.place.dto.SubscribeResponse;
 import com.moing.backend.domain.place.service.PlaceService;
 import com.moing.backend.domain.review.dto.ReviewListResponse;
@@ -83,10 +84,21 @@ public class PlaceController {
         return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query, filter));
     }
 
+    // 좌표의 행정동 조회 (현재 위치 표시용)
+    @GetMapping("/region")
+    public ResponseEntity<ApiResponse<RegionResponse>> getRegion(
+            @RequestParam double latitude,
+            @RequestParam double longitude
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                placeService.getRegion(latitude, longitude)));
+    }
+
     // 장소 검색 (카카오 로컬 API + 위치 기반 정렬)
+    // keyword 없으면 좌표 기준 주변 장소, 좌표도 없으면 빈 배열
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<PlaceNearbyResponse>> searchPlaces(
-            @RequestParam String keyword,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude
     ) {

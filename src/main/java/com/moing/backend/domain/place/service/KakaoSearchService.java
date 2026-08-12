@@ -1,6 +1,7 @@
 package com.moing.backend.domain.place.service;
 
 import com.moing.backend.domain.place.dto.KakaoLocalResponse;
+import com.moing.backend.domain.place.dto.KakaoRegionResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,7 @@ import java.net.URI;
 public class KakaoSearchService {
 
     private static final String KAKAO_LOCAL_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
+    private static final String KAKAO_REGION_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json";
     private static final int MAX_SIZE = 15;
 
     @Value("${kakao.api-key}")
@@ -63,6 +65,31 @@ public class KakaoSearchService {
             return response;
         } catch (RestClientException e) {
             log.warn("카카오 검색 API 호출 실패: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * 좌표를 행정구역 정보로 변환 (현재 위치의 "~~동" 표시용)
+     *
+     * @param latitude  위도 (WGS84)
+     * @param longitude 경도 (WGS84)
+     * @return 실패 시 null
+     */
+    public KakaoRegionResponse coord2Region(double latitude, double longitude) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "KakaoAK " + apiKey);
+
+        URI uri = UriComponentsBuilder.fromUriString(KAKAO_REGION_URL)
+                .queryParam("x", longitude)
+                .queryParam("y", latitude)
+                .encode().build().toUri();
+
+        try {
+            return restTemplate.exchange(uri, HttpMethod.GET, new HttpEntity<>(headers), KakaoRegionResponse.class)
+                    .getBody();
+        } catch (RestClientException e) {
+            log.warn("카카오 좌표→행정구역 API 호출 실패: {}", e.getMessage(), e);
             return null;
         }
     }

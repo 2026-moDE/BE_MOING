@@ -6,6 +6,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -49,6 +50,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.MALFORMED_REQUEST_BODY.getStatus())
                 .body(ApiResponse.error(ErrorCode.MALFORMED_REQUEST_BODY.getMessage()));
+    }
+
+    // 필수 쿼리 파라미터가 누락된 경우 - 400 반환
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameterException(MissingServletRequestParameterException e) {
+        return ResponseEntity
+                .status(ErrorCode.INVALID_INPUT.getStatus())
+                .body(ApiResponse.error(e.getParameterName() + " 파라미터가 필요합니다"));
     }
 
     // 처리되지 않은 모든 예외 처리 - 500 에러를 반환하고 스택 트레이스를 출력

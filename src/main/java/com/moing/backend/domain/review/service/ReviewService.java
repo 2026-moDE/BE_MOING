@@ -216,7 +216,7 @@ public class ReviewService {
         }
 
         // 같은 이름의 장소가 이미 존재하면 재사용
-        return placeRepository.findByNameAndIsActiveTrue(request.placeName())
+        return placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(request.placeName())
                 .map(Place::getId)
                 .orElseGet(() -> {
                     Place newPlace = Place.builder()

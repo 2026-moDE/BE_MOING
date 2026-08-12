@@ -12,8 +12,12 @@ import java.util.Optional;
 
 public interface PlaceRepository extends JpaRepository<Place, Long> {
 
-    /** 장소명으로 활성 장소를 조회한다 (네이버 검색 결과 매칭용) */
-    Optional<Place> findByNameAndIsActiveTrue(String name);
+    /**
+     * 장소명으로 활성 장소를 조회한다 (검색 결과 매칭용)
+     * name에 unique 제약이 없어 동시 삽입으로 중복 행이 생길 수 있으므로,
+     * 단건 조회 대신 가장 먼저 생성된 행을 반환한다.
+     */
+    Optional<Place> findFirstByNameAndIsActiveTrueOrderByIdAsc(String name);
 
     /** 전체 활성 장소를 조회한다 */
     List<Place> findAllByIsActiveTrue();

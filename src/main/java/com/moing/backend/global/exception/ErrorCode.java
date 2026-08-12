@@ -17,6 +17,9 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "리소스를 찾을 수 없습니다"),
     DUPLICATE(HttpStatus.CONFLICT, "이미 존재합니다"),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다"),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Content-Type은 application/json이어야 합니다"),
+    MALFORMED_REQUEST_BODY(HttpStatus.BAD_REQUEST, "요청 본문의 형식이 올바르지 않습니다"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다"),
 
     // --- 온보딩 및 유저 관련 에러 코드 추가 ---
@@ -29,6 +32,16 @@ public enum ErrorCode {
     // --- 친구 관련 ---
     SELF_FOLLOW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신에게 친구 요청을 보낼 수 없습니다"),
     ALREADY_FOLLOWING(HttpStatus.CONFLICT, "이미 친구 요청 중이거나 친구 상태입니다"),
+
+    // --- 댓글 관련 ---
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다"),
+    NOT_FRIEND_REVIEW(HttpStatus.FORBIDDEN, "친구 공개 리뷰에는 친구만 접근할 수 있습니다"),
+    REPLY_NOT_ALLOWED(HttpStatus.FORBIDDEN, "친구 공개 리뷰에만 답글을 작성할 수 있습니다"),
+    NESTED_REPLY_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "답글에는 답글을 작성할 수 없습니다"),
+
+    // --- 이모지 반응 관련 ---
+    DUPLICATE_REACTION(HttpStatus.CONFLICT, "이미 추가한 이모지입니다"),
+    REACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "취소할 이모지 반응이 없습니다"),
 
     // --- 관리자 관련 ---
     ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");

@@ -3,6 +3,7 @@ package com.moing.backend.domain.review.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.review.entity.CongestionLevel;
+import com.moing.backend.domain.review.entity.Visibility;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -16,8 +17,9 @@ public record ReviewCreateRequest(
         @JsonProperty("place_category") PlaceCategory placeCategory,
         @JsonProperty("image_url") String imageUrl,
         @NotNull @JsonProperty("congestion_level") CongestionLevel congestionLevel,
-        @JsonProperty("quick_tag") String quickTag,
         String comment,
         @NotNull BigDecimal latitude,
-        @NotNull BigDecimal longitude
+        @NotNull BigDecimal longitude,
+        // 미지정 시 PUBLIC(전체 공개)
+        Visibility visibility
 ) {}

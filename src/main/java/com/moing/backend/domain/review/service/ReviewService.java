@@ -1,5 +1,7 @@
 package com.moing.backend.domain.review.service;
 
+import com.moing.backend.domain.follow.entity.FollowStatus;
+import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.Notification;
 import com.moing.backend.domain.notification.entity.NotificationType;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
@@ -16,8 +18,9 @@ import com.moing.backend.domain.review.dto.ReviewUpdateRequest;
 import com.moing.backend.domain.review.entity.ReviewReport;
 import com.moing.backend.domain.review.repository.ReviewReportRepository;
 import com.moing.backend.domain.review.entity.CongestionLevel;
+import com.moing.backend.domain.review.dto.ReviewDetailResponse;
 import com.moing.backend.domain.review.entity.Review;
-import com.moing.backend.domain.review.repository.ReviewHelpfulRepository;
+import com.moing.backend.domain.review.entity.Visibility;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
@@ -32,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,7 +42,6 @@ import java.util.stream.Collectors;
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
-    private final ReviewHelpfulRepository reviewHelpfulRepository;
     private final ReviewReportRepository reviewReportRepository;
     private final PlaceRepository placeRepository;
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
@@ -48,6 +49,57 @@ public class ReviewService {
     private final NotificationRepository notificationRepository;
     private final CongestionCacheService congestionCacheService;
     private final FcmService fcmService;
+    private final FollowRepository followRepository;
+
+    // 리뷰 상세 조회
+    @Transactional(readOnly = true)
+    public ReviewDetailResponse getReviewDetail(Long userId, Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        if (review.isBlinded()) {
+            throw new CustomException(ErrorCode.NOT_FOUND);
+        }
+
+        boolean isMine = userId.equals(review.getUserId());
+        boolean isFriend = !isMine && isFriend(userId, review.getUserId());
+
+        // 친구 공개 리뷰는 작성자 본인과 친구만 볼 수 있다
+        if (review.getVisibility() == Visibility.FRIENDS && !isMine && !isFriend) {
+            throw new CustomException(ErrorCode.NOT_FRIEND_REVIEW);
+        }
+
+        User author = userRepository.findById(review.getUserId()).orElse(null);
+        ReviewDetailResponse.UserInfo userInfo = author != null
+                ? new ReviewDetailResponse.UserInfo(author.getId(), author.getNickname(), author.getProfileImageUrl(), author.getProfileUrl())
+                : new ReviewDetailResponse.UserInfo(review.getUserId(), "알 수 없음", null, null);
+
+        String placeName = placeRepository.findById(review.getPlaceId())
+                .map(Place::getName)
+                .orElse(null);
+
+        return new ReviewDetailResponse(
+                review.getId(),
+                review.getPlaceId(),
+                placeName,
+                review.getImageUrl(),
+                review.getThumbnailUrl(),
+                review.getThumbnailSmallUrl(),
+                review.getCongestionLevel(),
+                review.getComment(),
+                isMine,
+                review.getVisibility() != null ? review.getVisibility() : Visibility.PUBLIC,
+                isFriend,
+                userInfo,
+                review.getCreatedAt()
+        );
+    }
+
+    // 서로 친구(ACCEPTED)인지 확인
+    private boolean isFriend(Long userId, Long targetUserId) {
+        return followRepository.existsByFollowerIdAndFollowingIdAndStatusIn(
+                userId, targetUserId, List.of(FollowStatus.ACCEPTED));
+    }
 
     // 리뷰 삭제
     @Transactional
@@ -103,12 +155,12 @@ public class ReviewService {
                 .userId(userId)
                 .placeId(placeId)
                 .congestionLevel(request.congestionLevel())
-                .quickTag(request.quickTag())
                 .comment(request.comment())
                 // 빈 문자열은 null로 정규화 (프론트 폴백 체인이 null 기준으로 동작)
                 .imageUrl(request.imageUrl() != null && !request.imageUrl().isBlank() ? request.imageUrl() : null)
                 .latitude(request.latitude())
                 .longitude(request.longitude())
+                .visibility(request.visibility())
                 .build();
 
         ReviewCreateResponse response = ReviewCreateResponse.from(reviewRepository.save(review));
@@ -167,7 +219,7 @@ public class ReviewService {
         }
 
         // 같은 이름의 장소가 이미 존재하면 재사용
-        return placeRepository.findByNameAndIsActiveTrue(request.placeName())
+        return placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(request.placeName())
                 .map(Place::getId)
                 .orElseGet(() -> {
                     Place newPlace = Place.builder()
@@ -191,9 +243,9 @@ public class ReviewService {
 
         LocalDateTime since = LocalDateTime.now().minusHours(72);
         List<Review> reviews = reviewRepository.findCurrentReviews(
-                placeId, since, cursor, PageRequest.of(0, limit + 1));
+                placeId, since, cursor, userId, PageRequest.of(0, limit + 1));
 
-        return buildResponse(reviews, limit, userId, true);
+        return buildResponse(reviews, limit, userId);
     }
 
     // 과거 리뷰 목록 (72h 경과, 커서 기반)
@@ -205,12 +257,12 @@ public class ReviewService {
 
         LocalDateTime since = LocalDateTime.now().minusHours(72);
         List<Review> reviews = reviewRepository.findArchivedReviews(
-                placeId, since, cursor, PageRequest.of(0, limit + 1));
+                placeId, since, cursor, userId, PageRequest.of(0, limit + 1));
 
-        return buildResponse(reviews, limit, userId, false);
+        return buildResponse(reviews, limit, userId);
     }
 
-    private ReviewListResponse buildResponse(List<Review> reviews, int limit, Long userId, boolean includeIsHelpful) {
+    private ReviewListResponse buildResponse(List<Review> reviews, int limit, Long userId) {
         boolean hasNext = reviews.size() > limit;
         List<Review> page = hasNext ? reviews.subList(0, limit) : reviews;
 
@@ -218,24 +270,16 @@ public class ReviewService {
         Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        Set<Long> helpfulReviewIds = Set.of();
-        if (includeIsHelpful && userId != null && !page.isEmpty()) {
-            List<Long> reviewIds = page.stream().map(Review::getId).toList();
-            helpfulReviewIds = reviewHelpfulRepository.findHelpfulReviewIds(userId, reviewIds);
-        }
-
-        final Set<Long> finalHelpfulIds = helpfulReviewIds;
         List<ReviewListResponse.ReviewItem> items = page.stream()
                 .map(r -> {
                     User user = userMap.get(r.getUserId());
                     ReviewListResponse.UserInfo userInfo = user != null
                             ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
                             : new ReviewListResponse.UserInfo("알 수 없음", null, null);
-                    Boolean isHelpful = includeIsHelpful ? finalHelpfulIds.contains(r.getId()) : null;
                     boolean isMine = userId != null && userId.equals(r.getUserId());
                     return new ReviewListResponse.ReviewItem(
                             r.getId(), r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
-                            r.getCongestionLevel(), r.getComment(), r.getHelpfulCount(), isHelpful, isMine,
+                            r.getCongestionLevel(), r.getComment(), isMine,
                             userInfo, r.getCreatedAt()
                     );
                 })

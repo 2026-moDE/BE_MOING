@@ -53,6 +53,10 @@ public class Review {
     @Column(name = "longitude", precision = 10, scale = 7)
     private BigDecimal longitude;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", length = 20)
+    private Visibility visibility;
+
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
@@ -72,7 +76,7 @@ public class Review {
     @Builder
     public Review(Long userId, Long placeId, CongestionLevel congestionLevel,
                   String quickTag, String comment, String imageUrl,
-                  BigDecimal latitude, BigDecimal longitude) {
+                  BigDecimal latitude, BigDecimal longitude, Visibility visibility) {
         this.userId = userId;
         this.placeId = placeId;
         this.congestionLevel = congestionLevel;
@@ -83,6 +87,7 @@ public class Review {
         this.thumbnailSmallUrl = generateThumbnailUrl(imageUrl, "thumbnail_small");
         this.latitude = latitude;
         this.longitude = longitude;
+        this.visibility = visibility != null ? visibility : Visibility.PUBLIC;
         this.status = "ACTIVE";
         this.helpfulCount = 0;
         this.viewCount = 0;

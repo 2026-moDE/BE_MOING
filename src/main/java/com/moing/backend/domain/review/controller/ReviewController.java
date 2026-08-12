@@ -2,6 +2,7 @@ package com.moing.backend.domain.review.controller;
 
 import com.moing.backend.domain.review.dto.ReviewCreateRequest;
 import com.moing.backend.domain.review.dto.ReviewCreateResponse;
+import com.moing.backend.domain.review.dto.ReviewDetailResponse;
 import com.moing.backend.domain.review.dto.ReviewReportRequest;
 import com.moing.backend.domain.review.dto.ReviewUpdateRequest;
 import com.moing.backend.domain.review.service.ReviewService;
@@ -19,6 +20,15 @@ import org.springframework.web.bind.annotation.*;
 public class ReviewController {
 
     private final ReviewService reviewService;
+
+    // 리뷰 상세 조회 (친구 공개 리뷰는 작성자 본인과 친구만 접근 가능)
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<ReviewDetailResponse>> getReviewDetail(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success", reviewService.getReviewDetail(userId, id)));
+    }
 
     @PatchMapping("/{id}")
     public ResponseEntity<Void> updateReview(

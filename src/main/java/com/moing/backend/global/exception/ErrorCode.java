@@ -36,7 +36,7 @@ public enum ErrorCode {
     // --- 댓글 관련 ---
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다"),
     NOT_FRIEND_REVIEW(HttpStatus.FORBIDDEN, "친구 공개 리뷰에는 친구만 접근할 수 있습니다"),
-    REPLY_NOT_ALLOWED(HttpStatus.FORBIDDEN, "친구 공개 리뷰에만 답글을 작성할 수 있습니다"),
+    SECRET_COMMENT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "친구 공개 리뷰에만 비밀 댓글을 작성할 수 있습니다"),
     NESTED_REPLY_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "답글에는 답글을 작성할 수 없습니다"),
 
     // --- 이모지 반응 관련 ---

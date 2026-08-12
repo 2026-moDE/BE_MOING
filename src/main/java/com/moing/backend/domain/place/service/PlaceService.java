@@ -3,7 +3,9 @@ package com.moing.backend.domain.place.service;
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.KakaoLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
+import com.moing.backend.domain.place.dto.KakaoRegionResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
+import com.moing.backend.domain.place.dto.RegionResponse;
 import com.moing.backend.domain.place.dto.SubscribeResponse;
 import com.moing.backend.domain.place.entity.PlaceSubscription;
 import com.moing.backend.domain.place.entity.PlaceCongestionCache;
@@ -30,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 장소 서비스
@@ -39,6 +42,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PlaceService {
+
+    // 키워드 없이 좌표만으로 검색할 때 적용하는 반경(m).
+    // 이 값이 없으면 전체 활성 장소가 반환되어 "주변"이 되지 않는다.
+    private static final int DEFAULT_NEARBY_RADIUS_METERS = 2000;
 
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
@@ -65,14 +72,9 @@ public class PlaceService {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         // query 없으면 DB에서 장소 버블 반환 (filter에 따라 분기)
+        // 지도 버블은 대표 사진이 있는 장소만 노출한다
         if (query == null || query.isBlank()) {
-            List<Place> places = resolvePlaces(filter, latitude, longitude, radius, since);
-            Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
-            List<PlaceNearbyResponse.PlaceItem> items = places.stream()
-                    .map(place -> toItem(place, filter, since, cacheMap.get(place.getId())))
-                    .filter(item -> item.thumbnailUrl() != null)
-                    .toList();
-            return new PlaceNearbyResponse(items);
+            return nearbyFromDb(latitude, longitude, radius, filter, since, true);
         }
 
         KakaoLocalResponse kakaoResult = kakaoSearchService.search(query, longitude, latitude, radius);
@@ -86,6 +88,25 @@ public class PlaceService {
                 .toList();
 
         return new PlaceNearbyResponse(items);
+    }
+
+    /**
+     * 좌표 기준 주변 장소를 DB에서 조회한다.
+     *
+     * @param photoOnly true면 대표 사진이 있는 장소만 (지도 버블용).
+     *                  검색 결과 목록에서는 사진 유무와 무관하게 모두 내려줘야 하므로 false.
+     */
+    private PlaceNearbyResponse nearbyFromDb(double latitude, double longitude, Integer radius,
+                                             String filter, LocalDateTime since, boolean photoOnly) {
+        List<Place> places = resolvePlaces(filter, latitude, longitude, radius, since);
+        Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
+
+        Stream<PlaceNearbyResponse.PlaceItem> items = places.stream()
+                .map(place -> toItem(place, filter, since, cacheMap.get(place.getId())));
+        if (photoOnly) {
+            items = items.filter(item -> item.thumbnailUrl() != null);
+        }
+        return new PlaceNearbyResponse(items.toList());
     }
 
     // filter 값에 따라 장소 목록 조회
@@ -163,10 +184,25 @@ public class PlaceService {
     }
 
     /**
-     * 장소 검색 (네이버 API + 위치 기반 필터링)
-     * latitude/longitude가 있으면 반경 내 결과만 반환, 없으면 전체 반환
+     * 장소 검색 (카카오 API + 위치 기반 필터링)
+     *
+     * <ul>
+     *   <li>keyword 있음 → 카카오 검색 후 DB 매칭</li>
+     *   <li>keyword 없음 + 좌표 있음 → 좌표 기준 주변 장소만 반환</li>
+     *   <li>keyword 없음 + 좌표 없음 → 빈 배열</li>
+     * </ul>
      */
     public PlaceNearbyResponse searchPlaces(String keyword, Double latitude, Double longitude) {
+        if (keyword == null || keyword.isBlank()) {
+            // 좌표가 없으면 기준점이 없으므로 아무것도 내려주지 않는다
+            if (latitude == null || longitude == null) {
+                return new PlaceNearbyResponse(List.of());
+            }
+            // 검색 목록은 사진 없는 장소도 포함한다
+            return nearbyFromDb(latitude, longitude, DEFAULT_NEARBY_RADIUS_METERS,
+                    "all", LocalDateTime.now().minusHours(72), false);
+        }
+
         KakaoLocalResponse kakaoResult = kakaoSearchService.search(
                 keyword,
                 longitude != null ? longitude : null,
@@ -201,6 +237,30 @@ public class PlaceService {
                 .toList();
 
         return new PlaceNearbyResponse(items);
+    }
+
+    /**
+     * 좌표의 행정동 조회 (현재 위치 표시용)
+     *
+     * 카카오는 같은 좌표에 법정동("B")과 행정동("H")을 함께 내려주므로 행정동만 고른다.
+     * 카카오 호출 실패나 행정구역이 없는 좌표(바다·해외)는 빈 응답을 돌려주고,
+     * 위치 표시는 부가 기능이므로 예외를 던지지 않는다.
+     */
+    public RegionResponse getRegion(double latitude, double longitude) {
+        KakaoRegionResponse result = kakaoSearchService.coord2Region(latitude, longitude);
+
+        if (result == null || result.documents() == null) {
+            return RegionResponse.empty();
+        }
+
+        return result.documents().stream()
+                .filter(doc -> "H".equals(doc.regionType()))
+                .findFirst()
+                .map(doc -> new RegionResponse(
+                        doc.region1depthName(),
+                        doc.region2depthName(),
+                        doc.region3depthName()))
+                .orElseGet(RegionResponse::empty);
     }
 
     /**

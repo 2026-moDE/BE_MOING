@@ -121,7 +121,7 @@ public class PlaceService {
 
         String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
         PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
-        return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, category, address);
+        return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, null, category, address);
     }
 
     // placeId 목록으로 혼잡도 캐시를 한 번에 로드
@@ -136,16 +136,16 @@ public class PlaceService {
     private PlaceNearbyResponse.PlaceItem toItem(Place place, String filter, LocalDateTime since, PlaceCongestionCache cache) {
         CongestionLevel congestionLevel = cache != null ? cache.getCongestionLevel() : null;
 
-        var thumbnailUrl = switch (filter) {
+        var topReview = switch (filter) {
             case "current" -> reviewRepository
                     .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
-                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+                    .stream().findFirst();
             case "archived" -> reviewRepository
                     .findTopWithArchivedImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
-                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+                    .stream().findFirst();
             default -> reviewRepository  // "all"
                     .findTopWithImageAllTimeByPlaceId(place.getId(), PageRequest.of(0, 1))
-                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+                    .stream().findFirst();
         };
 
         return new PlaceNearbyResponse.PlaceItem(
@@ -154,7 +154,9 @@ public class PlaceService {
                 place.getLatitude().doubleValue(),
                 place.getLongitude().doubleValue(),
                 congestionLevel,
-                thumbnailUrl,
+                // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 원본으로 폴백
+                topReview.map(r -> r.getThumbnailUrl() != null ? r.getThumbnailUrl() : r.getImageUrl()).orElse(null),
+                topReview.map(Review::getThumbnailSmallUrl).orElse(null),
                 place.getCategory(),
                 place.getAddress()
         );
@@ -194,7 +196,7 @@ public class PlaceService {
 
                     String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
                     PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
-                    return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, category, address);
+                    return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, null, category, address);
                 })
                 .toList();
 

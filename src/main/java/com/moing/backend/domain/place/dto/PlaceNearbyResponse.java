@@ -15,6 +15,7 @@ public record PlaceNearbyResponse(List<PlaceItem> places) {
             double longitude,
             @JsonProperty("congestion_level") CongestionLevel congestionLevel,
             @JsonProperty("thumbnail_url") String thumbnailUrl,
+            @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl,
             PlaceCategory category,
             String address
     ) {}

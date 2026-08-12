@@ -3,6 +3,7 @@ package com.moing.backend.domain.review.service;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.Notification;
+import com.moing.backend.domain.notification.entity.NotificationType;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.entity.PlaceSubscription;
@@ -155,7 +156,8 @@ public class ReviewService {
                 .placeId(placeId)
                 .congestionLevel(request.congestionLevel())
                 .comment(request.comment())
-                .imageUrl(request.imageUrl())
+                // 빈 문자열은 null로 정규화 (프론트 폴백 체인이 null 기준으로 동작)
+                .imageUrl(request.imageUrl() != null && !request.imageUrl().isBlank() ? request.imageUrl() : null)
                 .latitude(request.latitude())
                 .longitude(request.longitude())
                 .visibility(request.visibility())
@@ -191,6 +193,7 @@ public class ReviewService {
             notificationRepository.save(Notification.builder()
                     .userId(subscriber.getId())
                     .placeId(placeId)
+                    .type(NotificationType.REVIEW)
                     .title(title)
                     .body(body)
                     .build());
@@ -271,8 +274,8 @@ public class ReviewService {
                 .map(r -> {
                     User user = userMap.get(r.getUserId());
                     ReviewListResponse.UserInfo userInfo = user != null
-                            ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl())
-                            : new ReviewListResponse.UserInfo("알 수 없음", null);
+                            ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
+                            : new ReviewListResponse.UserInfo("알 수 없음", null, null);
                     boolean isMine = userId != null && userId.equals(r.getUserId());
                     return new ReviewListResponse.ReviewItem(
                             r.getId(), r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),

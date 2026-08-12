@@ -1,5 +1,6 @@
 package com.moing.backend.domain.user.service;
 
+import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.Notification;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.place.entity.Place;
@@ -37,6 +38,7 @@ public class UserService {
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
     private final PlaceRepository placeRepository;
     private final NotificationRepository notificationRepository;
+    private final FollowRepository followRepository;
 
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -45,15 +47,18 @@ public class UserService {
         long reviewCount = reviewRepository.countByUserId(userId);
         long placeCount = reviewRepository.countDistinctPlaceIdByUserId(userId);
         long subscriptionCount = placeSubscriptionRepository.countByUserId(userId);
+        long friendCount = followRepository.countFriends(userId);
 
         return new UserProfileResponse(
                 user.getId(),
                 user.getNickname(),
                 user.getEmail(),
                 user.getProfileImageUrl(),
+                user.getProfileUrl(),
                 reviewCount,
                 placeCount,
-                subscriptionCount
+                subscriptionCount,
+                friendCount
         );
     }
 
@@ -110,7 +115,9 @@ public class UserService {
                 }
             }
             return new NotificationListResponse.NotificationItem(
-                    n.getId(), n.getTitle(), n.getBody(), placeInfo,
+                    n.getId(),
+                    n.getType() != null ? n.getType().name() : null,
+                    n.getTitle(), n.getBody(), placeInfo,
                     n.isRead(), n.getCreatedAt());
         }).toList();
 
@@ -130,7 +137,8 @@ public class UserService {
         }
 
         if (request.profileImageUrl() != null) {
-            user.updateProfileImageUrl(request.profileImageUrl());
+            // 빈 문자열은 null로 정규화해 저장 (프로필 이미지 제거로 동작)
+            user.updateProfileImageUrl(request.profileImageUrl().isBlank() ? null : request.profileImageUrl());
         }
 
         return new UserUpdateResponse(user.getNickname(), user.getProfileImageUrl());
@@ -148,12 +156,17 @@ public class UserService {
 
         List<SubscriptionListResponse.SubscriptionItem> items = subscriptions.stream().map(s -> {
             Place place = placeMap.get(s.getPlaceId());
-            String thumbnail = reviewRepository
+            var topReview = reviewRepository
                     .findTopWithImageAllTimeByPlaceId(s.getPlaceId(), PageRequest.of(0, 1))
-                    .stream().findFirst().map(Review::getImageUrl).orElse(null);
+                    .stream().findFirst();
+            // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 원본으로 폴백
+            String thumbnail = topReview
+                    .map(r -> r.getThumbnailUrl() != null ? r.getThumbnailUrl() : r.getImageUrl())
+                    .orElse(null);
+            String thumbnailSmall = topReview.map(Review::getThumbnailSmallUrl).orElse(null);
             SubscriptionListResponse.PlaceInfo placeInfo = place != null
-                    ? new SubscriptionListResponse.PlaceInfo(place.getId(), place.getName(), place.getAddress(), thumbnail)
-                    : new SubscriptionListResponse.PlaceInfo(s.getPlaceId(), null, null, thumbnail);
+                    ? new SubscriptionListResponse.PlaceInfo(place.getId(), place.getName(), place.getAddress(), thumbnail, thumbnailSmall)
+                    : new SubscriptionListResponse.PlaceInfo(s.getPlaceId(), null, null, thumbnail, thumbnailSmall);
             return new SubscriptionListResponse.SubscriptionItem(
                     s.getId(), placeInfo, true, s.getCreatedAt());
         }).toList();

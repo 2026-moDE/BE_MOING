@@ -17,6 +17,7 @@ public record NotificationListResponse(
 
     public record NotificationItem(
             Long id,
+            String type,
             String title,
             String body,
             PlaceInfo place,

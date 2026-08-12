@@ -27,6 +27,7 @@ public record ReviewDetailResponse(
     public record UserInfo(
             @JsonProperty("user_id") Long userId,
             String nickname,
-            @JsonProperty("profile_image_url") String profileImageUrl
+            @JsonProperty("profile_image_url") String profileImageUrl,
+            @JsonProperty("profile_url") String profileUrl
     ) {}
 }

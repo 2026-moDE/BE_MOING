@@ -71,8 +71,8 @@ public class ReviewService {
 
         User author = userRepository.findById(review.getUserId()).orElse(null);
         ReviewDetailResponse.UserInfo userInfo = author != null
-                ? new ReviewDetailResponse.UserInfo(author.getId(), author.getNickname(), author.getProfileImageUrl())
-                : new ReviewDetailResponse.UserInfo(review.getUserId(), "알 수 없음", null);
+                ? new ReviewDetailResponse.UserInfo(author.getId(), author.getNickname(), author.getProfileImageUrl(), author.getProfileUrl())
+                : new ReviewDetailResponse.UserInfo(review.getUserId(), "알 수 없음", null, null);
 
         String placeName = placeRepository.findById(review.getPlaceId())
                 .map(Place::getName)

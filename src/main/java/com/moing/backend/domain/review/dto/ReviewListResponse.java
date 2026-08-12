@@ -23,8 +23,6 @@ public record ReviewListResponse(
             @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl,
             @JsonProperty("congestion_level") CongestionLevel congestionLevel,
             String comment,
-            @JsonProperty("helpful_count") int helpfulCount,
-            @JsonProperty("is_helpful") Boolean isHelpful,
             @JsonProperty("is_mine") boolean isMine,
             UserInfo user,
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")

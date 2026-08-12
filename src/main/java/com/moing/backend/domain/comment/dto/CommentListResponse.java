@@ -1,0 +1,32 @@
+package com.moing.backend.domain.comment.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public record CommentListResponse(
+        List<CommentItem> comments,
+        @JsonProperty("next_cursor") Long nextCursor
+) {
+    public record UserInfo(
+            String nickname,
+            @JsonProperty("profile_image_url") String profileImageUrl
+    ) {}
+
+    public record CommentItem(
+            Long id,
+            @JsonProperty("parent_id") Long parentId,
+            // 열람 권한이 없는 비밀 댓글은 null
+            String content,
+            @JsonProperty("is_secret") boolean isSecret,
+            @JsonProperty("is_mine") boolean isMine,
+            @JsonProperty("is_deleted") boolean isDeleted,
+            UserInfo user,
+            @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
+            @JsonProperty("created_at") LocalDateTime createdAt,
+            // 친구 공개 리뷰에서만 내려간다. 전체 공개 리뷰는 null
+            List<CommentItem> replies
+    ) {}
+}

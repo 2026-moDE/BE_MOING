@@ -78,7 +78,7 @@ public class UserService {
                     : new MyReviewListResponse.PlaceInfo(r.getPlaceId(), null, null);
             return new MyReviewListResponse.MyReviewItem(
                     r.getId(), placeInfo, r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
-                    r.getCongestionLevel(), r.getComment(), r.getHelpfulCount(), r.getCreatedAt());
+                    r.getCongestionLevel(), r.getComment(), r.getCreatedAt());
         }).toList();
 
         return new MyReviewListResponse(items, nextCursor);

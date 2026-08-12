@@ -111,7 +111,7 @@ public class PlaceService {
         double docLng = Double.parseDouble(doc.x());
         String name = doc.placeName();
 
-        Optional<Place> dbPlace = placeRepository.findByNameAndIsActiveTrue(name);
+        Optional<Place> dbPlace = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
 
         if (dbPlace.isPresent()) {
             Place place = dbPlace.get();
@@ -186,7 +186,7 @@ public class PlaceService {
                     double docLat = Double.parseDouble(doc.y());
                     String name = doc.placeName();
 
-                    Optional<Place> dbPlace = placeRepository.findByNameAndIsActiveTrue(name);
+                    Optional<Place> dbPlace = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
 
                     if (dbPlace.isPresent()) {
                         Place place = dbPlace.get();

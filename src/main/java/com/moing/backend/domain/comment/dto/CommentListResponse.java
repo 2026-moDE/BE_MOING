@@ -1,14 +1,13 @@
-package com.moing.backend.domain.review.dto;
+package com.moing.backend.domain.comment.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.moing.backend.domain.review.entity.CongestionLevel;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-public record ReviewListResponse(
-        List<ReviewItem> reviews,
+public record CommentListResponse(
+        List<CommentItem> comments,
         @JsonProperty("next_cursor") Long nextCursor
 ) {
     public record UserInfo(
@@ -17,16 +16,18 @@ public record ReviewListResponse(
             @JsonProperty("profile_url") String profileUrl
     ) {}
 
-    public record ReviewItem(
+    public record CommentItem(
             Long id,
-            @JsonProperty("image_url") String imageUrl,
-            @JsonProperty("thumbnail_url") String thumbnailUrl,
-            @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl,
-            @JsonProperty("congestion_level") CongestionLevel congestionLevel,
-            String comment,
+            @JsonProperty("parent_id") Long parentId,
+            // 열람 권한이 없는 비밀 댓글은 null
+            String content,
+            @JsonProperty("is_secret") boolean isSecret,
             @JsonProperty("is_mine") boolean isMine,
+            @JsonProperty("is_deleted") boolean isDeleted,
             UserInfo user,
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
-            @JsonProperty("created_at") LocalDateTime createdAt
+            @JsonProperty("created_at") LocalDateTime createdAt,
+            // 친구 공개 리뷰에서만 내려간다. 전체 공개 리뷰는 null
+            List<CommentItem> replies
     ) {}
 }

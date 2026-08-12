@@ -130,7 +130,7 @@ public class SearchService {
         double lng = Double.parseDouble(doc.x());
 
         // DB에 있으면 혼잡도·썸네일 포함, 없으면 upsert 후 반환
-        Optional<Place> existing = placeRepository.findByNameAndIsActiveTrue(name);
+        Optional<Place> existing = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
         if (existing.isPresent()) {
             return toSearchItem(existing.get(), since);
         }

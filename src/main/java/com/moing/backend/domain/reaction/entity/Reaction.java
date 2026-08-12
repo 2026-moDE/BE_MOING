@@ -11,8 +11,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
+// 한 사람은 리뷰당 이모지를 하나만 가질 수 있다
 @Table(name = "reactions",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"review_id", "user_id", "emoji"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"review_id", "user_id"}))
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -41,6 +42,11 @@ public class Reaction {
     public Reaction(Long reviewId, Long userId, String emoji) {
         this.reviewId = reviewId;
         this.userId = userId;
+        this.emoji = emoji;
+    }
+
+    // 다른 이모지를 누르면 기존 반응을 교체한다 (리뷰당 하나만 가능)
+    public void changeEmoji(String emoji) {
         this.emoji = emoji;
     }
 }

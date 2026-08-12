@@ -7,11 +7,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface ReactionRepository extends JpaRepository<Reaction, Long> {
 
-    boolean existsByReviewIdAndUserIdAndEmoji(Long reviewId, Long userId, String emoji);
+    // 리뷰당 한 사람의 반응은 최대 하나
+    Optional<Reaction> findByReviewIdAndUserId(Long reviewId, Long userId);
 
     // 삭제된 건수를 돌려주므로 0이면 취소할 반응이 없었다는 뜻이다
     long deleteByReviewIdAndUserIdAndEmoji(Long reviewId, Long userId, String emoji);

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -28,7 +29,7 @@ public class ReactionService {
     private final ReviewRepository reviewRepository;
     private final FollowRepository followRepository;
 
-    // 이모지 반응 추가
+    // 이모지 반응 추가 (리뷰당 하나만 가능, 다른 이모지를 누르면 교체)
     @Transactional
     public void addReaction(Long userId, Long reviewId, ReactionCreateRequest request) {
         Review review = getReview(reviewId);
@@ -36,12 +37,19 @@ public class ReactionService {
 
         String emoji = request.emoji();
 
-        if (reactionRepository.existsByReviewIdAndUserIdAndEmoji(reviewId, userId, emoji)) {
-            throw new CustomException(ErrorCode.DUPLICATE_REACTION);
+        Optional<Reaction> existing = reactionRepository.findByReviewIdAndUserId(reviewId, userId);
+        if (existing.isPresent()) {
+            Reaction reaction = existing.get();
+            // 같은 이모지를 다시 누른 경우
+            if (reaction.getEmoji().equals(emoji)) {
+                throw new CustomException(ErrorCode.DUPLICATE_REACTION);
+            }
+            reaction.changeEmoji(emoji);
+            return;
         }
 
         try {
-            // 동시 중복 요청 시 unique constraint 위반을 409로 변환
+            // 동시 요청으로 이미 반응이 생겼다면 unique constraint 위반을 409로 변환
             reactionRepository.saveAndFlush(Reaction.builder()
                     .reviewId(reviewId)
                     .userId(userId)

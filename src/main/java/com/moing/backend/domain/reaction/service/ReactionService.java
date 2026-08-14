@@ -2,6 +2,10 @@ package com.moing.backend.domain.reaction.service;
 
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
+import com.moing.backend.domain.notification.entity.NotificationType;
+import com.moing.backend.domain.notification.service.NotificationService;
+import com.moing.backend.domain.place.entity.Place;
+import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.reaction.dto.ReactionCreateRequest;
 import com.moing.backend.domain.reaction.dto.ReactionListResponse;
 import com.moing.backend.domain.reaction.entity.Reaction;
@@ -31,6 +35,8 @@ public class ReactionService {
     private final ReviewRepository reviewRepository;
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final PlaceRepository placeRepository;
+    private final NotificationService notificationService;
 
     // 이모지 반응 추가 (리뷰당 하나만 가능, 다른 이모지를 누르면 교체)
     // 자기 리뷰에는 남길 수 없고 목록 조회만 가능하다
@@ -52,6 +58,8 @@ public class ReactionService {
                 throw new CustomException(ErrorCode.DUPLICATE_REACTION);
             }
             reaction.changeEmoji(emoji);
+            // 다른 이모지로 바꾼 것도 새 반응으로 보고 알린다
+            notifyReviewAuthor(review);
             return;
         }
 
@@ -65,6 +73,24 @@ public class ReactionService {
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.DUPLICATE_REACTION);
         }
+
+        notifyReviewAuthor(review);
+    }
+
+    // 리뷰 작성자에게 반응 알림 (자기 리뷰에는 반응할 수 없으므로 본인에게 갈 일은 없다)
+    private void notifyReviewAuthor(Review review) {
+        String placeName = placeRepository.findById(review.getPlaceId())
+                .map(Place::getName)
+                .orElse(null);
+        if (placeName == null) return;
+
+        notificationService.send(
+                review.getUserId(),
+                NotificationType.REACTION,
+                review.getPlaceId(),
+                review.getId(),
+                "작성하신 리뷰에 새로운 반응이 달렸어요",
+                "'" + placeName + "'에 작성하신 리뷰에 새로운 반응이 달렸어요.");
     }
 
     // 이모지 반응 취소 (본인이 남긴 반응만)

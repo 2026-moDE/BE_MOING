@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -275,6 +276,12 @@ public class ReviewService {
         Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
+        // 작성자별 exists 대신 한 번에 조회해 N+1을 피한다
+        List<Long> otherUserIds = userId == null ? List.of()
+                : userIds.stream().filter(id -> !userId.equals(id)).toList();
+        Set<Long> friendIds = otherUserIds.isEmpty() ? Set.of()
+                : Set.copyOf(followRepository.findAcceptedFollowingIds(userId, otherUserIds));
+
         List<ReviewListResponse.ReviewItem> items = page.stream()
                 .map(r -> {
                     User user = userMap.get(r.getUserId());
@@ -282,10 +289,13 @@ public class ReviewService {
                             ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
                             : new ReviewListResponse.UserInfo("알 수 없음", null, null);
                     boolean isMine = userId != null && userId.equals(r.getUserId());
+                    // 상세 조회와 동일하게 내 리뷰면 is_friend는 false
+                    boolean isFriend = !isMine && friendIds.contains(r.getUserId());
                     return new ReviewListResponse.ReviewItem(
                             r.getId(), r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
                             r.getCongestionLevel(), r.getComment(), isMine,
-                            userInfo, r.getCreatedAt()
+                            r.getVisibility() != null ? r.getVisibility() : Visibility.PUBLIC,
+                            isFriend, userInfo, r.getCreatedAt()
                     );
                 })
                 .toList();

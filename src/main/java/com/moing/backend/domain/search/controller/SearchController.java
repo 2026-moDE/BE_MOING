@@ -26,6 +26,7 @@ public class SearchController {
     private final SearchService searchService;
 
     // 장소 검색
+    // keyword 없으면 좌표 기준 주변 장소를 내려준다 (keyword·좌표 둘 다 없으면 400)
     @GetMapping
     public ResponseEntity<ApiResponse<PlaceSearchResponse>> searchPlaces(
             @AuthenticationPrincipal Long userId,
@@ -34,9 +35,6 @@ public class SearchController {
             @RequestParam(required = false) Double longitude,
             @RequestParam(required = false) Integer radius
     ) {
-        if (!StringUtils.hasText(keyword)) {
-            throw new CustomException(ErrorCode.INVALID_INPUT);
-        }
         return ResponseEntity.ok(ApiResponse.success("success", searchService.searchPlaces(userId, keyword, latitude, longitude, radius)));
     }
 

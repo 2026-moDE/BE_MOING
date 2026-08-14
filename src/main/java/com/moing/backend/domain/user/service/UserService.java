@@ -117,7 +117,7 @@ public class UserService {
             return new NotificationListResponse.NotificationItem(
                     n.getId(),
                     n.getType() != null ? n.getType().name() : null,
-                    n.getTitle(), n.getBody(), placeInfo,
+                    n.getTitle(), n.getBody(), placeInfo, n.getReviewId(),
                     n.isRead(), n.getCreatedAt());
         }).toList();
 

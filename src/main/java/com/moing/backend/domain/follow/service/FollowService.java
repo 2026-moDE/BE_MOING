@@ -6,14 +6,12 @@ import com.moing.backend.domain.follow.dto.UserSearchResponse;
 import com.moing.backend.domain.follow.entity.Follow;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
-import com.moing.backend.domain.notification.entity.Notification;
 import com.moing.backend.domain.notification.entity.NotificationType;
-import com.moing.backend.domain.notification.repository.NotificationRepository;
+import com.moing.backend.domain.notification.service.NotificationService;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
-import com.moing.backend.global.infra.FcmService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -33,8 +31,7 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
-    private final FcmService fcmService;
+    private final NotificationService notificationService;
 
     private static final int SEARCH_LIMIT = 20;
 
@@ -72,8 +69,8 @@ public class FollowService {
         User requester = userRepository.findById(followerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         sendFriendNotification(target, NotificationType.FRIEND_REQUEST,
-                "새로운 친구 요청이 도착했어요!",
-                requester.getNickname() + "님이 친구 요청을 보냈어요");
+                "새로운 친구 요청을 확인해보세요",
+                requester.getNickname() + "님이 친구를 요청했어요");
     }
 
     @Transactional(readOnly = true)
@@ -127,21 +124,13 @@ public class FollowService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         userRepository.findById(requesterId).ifPresent(requester ->
                 sendFriendNotification(requester, NotificationType.FRIEND_ACCEPT,
-                        "친구 요청이 수락됐어요!",
-                        me.getNickname() + "님과 친구가 되었어요"));
+                        "친구 요청이 수락됐어요",
+                        me.getNickname() + "님이 친구 요청을 수락했어요"));
     }
 
+    // 친구 알림은 장소/리뷰와 무관하므로 place_id와 review_id가 없다
     private void sendFriendNotification(User target, NotificationType type, String title, String body) {
-        notificationRepository.save(Notification.builder()
-                .userId(target.getId())
-                .type(type)
-                .title(title)
-                .body(body)
-                .build());
-
-        if (target.getFcmToken() != null) {
-            fcmService.sendNotification(target.getFcmToken(), title, body);
-        }
+        notificationService.send(target, type, null, null, title, body);
     }
 
     @Transactional

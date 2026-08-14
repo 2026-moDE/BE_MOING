@@ -27,6 +27,10 @@ public class Notification {
     @Column(name = "place_id")
     private Long placeId;
 
+    // 리뷰로 이동하는 알림(REACTION, COMMENT 등)에만 채워진다
+    @Column(name = "review_id")
+    private Long reviewId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "type", length = 30)
     private NotificationType type;
@@ -45,9 +49,10 @@ public class Notification {
     private LocalDateTime createdAt;
 
     @Builder
-    public Notification(Long userId, Long placeId, NotificationType type, String title, String body) {
+    public Notification(Long userId, Long placeId, Long reviewId, NotificationType type, String title, String body) {
         this.userId = userId;
         this.placeId = placeId;
+        this.reviewId = reviewId;
         this.type = type;
         this.title = title;
         this.body = body;

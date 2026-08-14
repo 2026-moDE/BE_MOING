@@ -2,9 +2,8 @@ package com.moing.backend.domain.review.service;
 
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
-import com.moing.backend.domain.notification.entity.Notification;
 import com.moing.backend.domain.notification.entity.NotificationType;
-import com.moing.backend.domain.notification.repository.NotificationRepository;
+import com.moing.backend.domain.notification.service.NotificationService;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.entity.PlaceSubscription;
 import com.moing.backend.domain.place.repository.PlaceRepository;
@@ -17,7 +16,6 @@ import com.moing.backend.domain.review.dto.ReviewReportRequest;
 import com.moing.backend.domain.review.dto.ReviewUpdateRequest;
 import com.moing.backend.domain.review.entity.ReviewReport;
 import com.moing.backend.domain.review.repository.ReviewReportRepository;
-import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.dto.ReviewDetailResponse;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.entity.Visibility;
@@ -26,7 +24,6 @@ import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
-import com.moing.backend.global.infra.FcmService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -47,9 +44,8 @@ public class ReviewService {
     private final PlaceRepository placeRepository;
     private final PlaceSubscriptionRepository placeSubscriptionRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final CongestionCacheService congestionCacheService;
-    private final FcmService fcmService;
     private final FollowRepository followRepository;
 
     // 리뷰 상세 조회
@@ -169,22 +165,19 @@ public class ReviewService {
                 .visibility(request.visibility())
                 .build();
 
-        ReviewCreateResponse response = ReviewCreateResponse.from(reviewRepository.save(review));
+        Review saved = reviewRepository.save(review);
+        ReviewCreateResponse response = ReviewCreateResponse.from(saved);
         congestionCacheService.refreshForPlace(placeId);
-        sendReviewNotifications(userId, placeId, request.congestionLevel());
+        sendReviewNotifications(userId, placeId, saved.getId());
         return response;
     }
 
-    private void sendReviewNotifications(Long reviewerId, Long placeId, CongestionLevel congestionLevel) {
+    private void sendReviewNotifications(Long reviewerId, Long placeId, Long reviewId) {
         Place place = placeRepository.findById(placeId).orElse(null);
         if (place == null) return;
 
-        String title = switch (congestionLevel) {
-            case LOW -> "관심있어 하신 장소가 지금 한산해요!";
-            case MEDIUM -> "관심있어 하신 장소가 지금 보통이에요!";
-            case HIGH -> "관심있어 하신 장소가 지금 붐벼요!";
-        };
-        String body = place.getName() + "에 새 리뷰가 등록됐어요!";
+        String title = "관심있어 하신 장소에 새로운 리뷰가 작성됐어요";
+        String body = "관심 장소로 등록하신 '" + place.getName() + "'에 새로운 리뷰가 작성됐어요.";
 
         List<PlaceSubscription> subscriptions = placeSubscriptionRepository.findByPlaceId(placeId);
         List<Long> subscriberIds = subscriptions.stream()
@@ -196,17 +189,7 @@ public class ReviewService {
 
         List<User> subscribers = userRepository.findAllById(subscriberIds);
         for (User subscriber : subscribers) {
-            notificationRepository.save(Notification.builder()
-                    .userId(subscriber.getId())
-                    .placeId(placeId)
-                    .type(NotificationType.REVIEW)
-                    .title(title)
-                    .body(body)
-                    .build());
-
-            if (subscriber.getFcmToken() != null) {
-                fcmService.sendNotification(subscriber.getFcmToken(), title, body);
-            }
+            notificationService.send(subscriber, NotificationType.REVIEW, placeId, reviewId, title, body);
         }
     }
 

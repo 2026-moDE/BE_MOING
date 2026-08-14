@@ -8,6 +8,10 @@ import com.moing.backend.domain.comment.entity.Comment;
 import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
+import com.moing.backend.domain.notification.entity.NotificationType;
+import com.moing.backend.domain.notification.service.NotificationService;
+import com.moing.backend.domain.place.entity.Place;
+import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.entity.Visibility;
 import com.moing.backend.domain.review.repository.ReviewRepository;
@@ -33,6 +37,8 @@ public class CommentService {
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
+    private final PlaceRepository placeRepository;
+    private final NotificationService notificationService;
 
     // 댓글 작성 (비밀 댓글은 친구 공개 리뷰에서만 가능)
     @Transactional
@@ -51,6 +57,11 @@ public class CommentService {
                 .content(request.content())
                 .isSecret(request.isSecret())
                 .build());
+
+        // 내 리뷰에 내가 단 댓글은 알리지 않는다
+        if (!userId.equals(review.getUserId())) {
+            notifyComment(review, review.getUserId());
+        }
 
         return CommentCreateResponse.from(comment);
     }
@@ -79,7 +90,44 @@ public class CommentService {
                 .content(request.content())
                 .build());
 
+        // 댓글 작성자에게 답글 알림 (내 댓글에 내가 단 답글은 제외)
+        if (!userId.equals(parent.getUserId())) {
+            notifyReply(review, parent.getUserId());
+        }
+        // 리뷰 작성자에게도 알리되, 댓글 작성자와 같은 사람이면 두 번 보내지 않는다
+        if (!userId.equals(review.getUserId()) && !review.getUserId().equals(parent.getUserId())) {
+            notifyComment(review, review.getUserId());
+        }
+
         return CommentCreateResponse.from(reply);
+    }
+
+    // 리뷰에 댓글이 달렸음을 리뷰 작성자에게 알린다
+    private void notifyComment(Review review, Long targetUserId) {
+        String placeName = getPlaceName(review);
+        if (placeName == null) return;
+
+        notificationService.send(targetUserId, NotificationType.COMMENT,
+                review.getPlaceId(), review.getId(),
+                "작성하신 리뷰에 새로운 댓글이 달렸어요",
+                "'" + placeName + "'에 작성하신 리뷰에 새로운 댓글이 달렸어요.");
+    }
+
+    // 댓글에 답글이 달렸음을 댓글 작성자에게 알린다 (타입은 COMMENT로 같고 문구만 다르다)
+    private void notifyReply(Review review, Long targetUserId) {
+        String placeName = getPlaceName(review);
+        if (placeName == null) return;
+
+        notificationService.send(targetUserId, NotificationType.COMMENT,
+                review.getPlaceId(), review.getId(),
+                "작성하신 댓글에 새로운 답글이 달렸어요",
+                "'" + placeName + "'에 작성하신 댓글에 새로운 답글이 달렸어요.");
+    }
+
+    private String getPlaceName(Review review) {
+        return placeRepository.findById(review.getPlaceId())
+                .map(Place::getName)
+                .orElse(null);
     }
 
     // 댓글 삭제 (본인 댓글만)

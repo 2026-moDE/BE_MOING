@@ -2,7 +2,6 @@ package com.moing.backend.domain.reaction.service;
 
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
-import com.moing.backend.domain.reaction.dto.EmojiCount;
 import com.moing.backend.domain.reaction.dto.ReactionCreateRequest;
 import com.moing.backend.domain.reaction.dto.ReactionListResponse;
 import com.moing.backend.domain.reaction.entity.Reaction;
@@ -10,6 +9,8 @@ import com.moing.backend.domain.reaction.repository.ReactionRepository;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.entity.Visibility;
 import com.moing.backend.domain.review.repository.ReviewRepository;
+import com.moing.backend.domain.user.entity.User;
+import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +30,16 @@ public class ReactionService {
     private final ReactionRepository reactionRepository;
     private final ReviewRepository reviewRepository;
     private final FollowRepository followRepository;
+    private final UserRepository userRepository;
 
     // 이모지 반응 추가 (리뷰당 하나만 가능, 다른 이모지를 누르면 교체)
+    // 자기 리뷰에는 남길 수 없고 목록 조회만 가능하다
     @Transactional
     public void addReaction(Long userId, Long reviewId, ReactionCreateRequest request) {
         Review review = getReview(reviewId);
+        if (userId.equals(review.getUserId())) {
+            throw new CustomException(ErrorCode.SELF_REACTION_NOT_ALLOWED);
+        }
         validateAccess(userId, review);
 
         String emoji = request.emoji();
@@ -74,27 +81,37 @@ public class ReactionService {
         }
     }
 
-    // 이모지 반응 목록 조회 (이모지 종류별 그룹화)
+    // 이모지 반응 목록 조회 (반응을 남긴 사람 정보 포함)
     @Transactional(readOnly = true)
     public ReactionListResponse getReactions(Long userId, Long reviewId) {
         Review review = getReview(reviewId);
         validateAccess(userId, review);
 
-        List<EmojiCount> counts = reactionRepository.countGroupedByEmoji(reviewId);
-        if (counts.isEmpty()) {
+        List<Reaction> reactions = reactionRepository.findByReviewIdOrderByIdAsc(reviewId);
+        if (reactions.isEmpty()) {
             return new ReactionListResponse(List.of());
         }
 
-        Set<String> myEmojis = reactionRepository.findEmojisByUser(reviewId, userId);
+        // 반응을 남긴 유저를 한 번에 조회 (N+1 방지)
+        List<Long> userIds = reactions.stream().map(Reaction::getUserId).distinct().toList();
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
 
-        List<ReactionListResponse.ReactionItem> items = counts.stream()
-                .map(c -> new ReactionListResponse.ReactionItem(
-                        c.emoji(),
-                        c.count(),
-                        myEmojis.contains(c.emoji())))
+        List<ReactionListResponse.ReactionItem> items = reactions.stream()
+                .map(r -> new ReactionListResponse.ReactionItem(
+                        r.getEmoji(),
+                        userId.equals(r.getUserId()),
+                        toUserInfo(userMap.get(r.getUserId()))))
                 .toList();
 
         return new ReactionListResponse(items);
+    }
+
+    // 탈퇴한 유저의 반응도 남아 있으므로 작성자를 찾지 못하는 경우를 대비한다
+    private ReactionListResponse.UserInfo toUserInfo(User user) {
+        return user != null
+                ? new ReactionListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
+                : new ReactionListResponse.UserInfo("알 수 없음", null, null);
     }
 
     // 친구 공개 리뷰는 리뷰 작성자 본인과 친구만 접근할 수 있다

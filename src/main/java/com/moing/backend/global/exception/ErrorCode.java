@@ -42,6 +42,7 @@ public enum ErrorCode {
     // --- 이모지 반응 관련 ---
     DUPLICATE_REACTION(HttpStatus.CONFLICT, "이미 추가한 이모지입니다"),
     REACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "취소할 이모지 반응이 없습니다"),
+    SELF_REACTION_NOT_ALLOWED(HttpStatus.FORBIDDEN, "자신의 리뷰에는 이모지를 남길 수 없습니다"),
 
     // --- 관리자 관련 ---
     ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");

@@ -34,8 +34,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "social_provider", nullable = false, length = 20)
-    private String socialProvider;
+    private SocialProvider socialProvider;
 
     @Column(name = "social_id", nullable = false, length = 100)
     private String socialId;
@@ -76,7 +77,7 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    public User(String socialProvider, String socialId, String nickname,
+    public User(SocialProvider socialProvider, String socialId, String nickname,
                 String profileImageUrl, String email, String fcmToken) {
         this.socialProvider = socialProvider;
         this.socialId = socialId;

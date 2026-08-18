@@ -1,5 +1,6 @@
 package com.moing.backend.domain.user.repository;
 
+import com.moing.backend.domain.user.entity.SocialProvider;
 import com.moing.backend.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,9 +18,10 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     // 기존 소셜 로그인 조회 (탈퇴 유저 제외 - @SQLRestriction 적용)
-    Optional<User> findBySocialProviderAndSocialId(String socialProvider, String socialId);
+    Optional<User> findBySocialProviderAndSocialId(SocialProvider socialProvider, String socialId);
 
     // 탈퇴 유저 포함 조회 (재가입 감지용 - native query로 @SQLRestriction 우회)
+    // native query는 enum 매핑을 타지 않으므로 SocialProvider.name() 문자열을 넘겨야 한다.
     @Query(value = "SELECT * FROM users WHERE social_provider = :provider AND social_id = :socialId LIMIT 1", nativeQuery = true)
     Optional<User> findBySocialProviderAndSocialIdIncludeDeleted(@Param("provider") String provider, @Param("socialId") String socialId);
 

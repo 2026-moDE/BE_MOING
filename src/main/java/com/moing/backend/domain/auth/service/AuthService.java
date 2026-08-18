@@ -121,8 +121,7 @@ public class AuthService {
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
-        // 닉네임 뒤에 타임스탬프를 붙여 기존 닉네임 선점을 해제 -> 다른 사용자가 탈퇴한 사람 닉네임 사용 가능하도록
-        user.updateNickname(user.getNickname() + "_deleted_" + System.currentTimeMillis());
+        // @SQLDelete가 deleted_at 설정과 닉네임 해제를 한 번에 처리한다 (User 참고)
         userRepository.delete(user);
     }
 

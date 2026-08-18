@@ -25,6 +25,18 @@ kakao:
   api-key: ${KAKAO_API_KEY:}
   user-info-url: https://kapi.kakao.com/v2/user/me
 
+# 구글/애플은 앱이 보낸 ID token(JWT)을 서버가 검증한다.
+# client-ids는 토큰의 aud와 대조할 값으로, iOS/안드로이드 client id가 다르면 콤마로 나열한다.
+google:
+  client-ids: ${GOOGLE_CLIENT_IDS:}
+  jwks-url: https://www.googleapis.com/oauth2/v3/certs
+  issuer: https://accounts.google.com
+
+apple:
+  client-ids: ${APPLE_CLIENT_IDS:}
+  jwks-url: https://appleid.apple.com/auth/keys
+  issuer: https://appleid.apple.com
+
 naver:
   api-key-id: ${NAVER_API_KEY_ID:}
   api-key: ${NAVER_API_KEY:}

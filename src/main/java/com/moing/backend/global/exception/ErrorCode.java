@@ -38,6 +38,7 @@ public enum ErrorCode {
     NOT_FRIEND_REVIEW(HttpStatus.FORBIDDEN, "친구 공개 리뷰에는 친구만 접근할 수 있습니다"),
     SECRET_COMMENT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "친구 공개 리뷰에만 비밀 댓글을 작성할 수 있습니다"),
     NESTED_REPLY_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "답글에는 답글을 작성할 수 없습니다"),
+    DELETED_COMMENT_REPLY_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "삭제된 댓글에는 답글을 작성할 수 없습니다"),
 
     // --- 이모지 반응 관련 ---
     DUPLICATE_REACTION(HttpStatus.CONFLICT, "이미 추가한 이모지입니다"),

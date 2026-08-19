@@ -1,5 +1,6 @@
 package com.moing.backend.domain.auth.service;
 
+import com.moing.backend.domain.auth.dto.SocialUserInfo;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +32,7 @@ public class KakaoClient {
 
     // 액세스 토큰으로 카카오 사용자 정보를 조회한다. 실패 시 401 에러를 던진다.
     @SuppressWarnings("unchecked")
-    public KakaoUserInfo getUserInfo(String accessToken) {
+    public SocialUserInfo getUserInfo(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         HttpEntity<Void> request = new HttpEntity<>(headers);
@@ -49,12 +50,11 @@ public class KakaoClient {
             String nickname = (String) profile.get("nickname");
             String profileImageUrl = (String) profile.get("profile_image_url");
 
-            return new KakaoUserInfo(socialId, nickname, profileImageUrl);
+            // 카카오는 이메일 조회에 별도 동의 항목이 필요해 받아오지 않는다
+            return SocialUserInfo.of(socialId, nickname, profileImageUrl);
         } catch (RestClientException e) {
             log.debug("카카오 API 에러: {}", e.getMessage());
             throw new CustomException(ErrorCode.UNAUTHORIZED);
         }
     }
-
-    public record KakaoUserInfo(String socialId, String nickname, String profileImageUrl) {}
 }

@@ -16,40 +16,46 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Optional<Review> findTopByPlaceIdAndIsBlindedFalseAndCreatedAtAfterOrderByCreatedAtDesc(
             Long placeId, LocalDateTime since);
 
-    // 72h 이내 helpful_count 가장 높은 리뷰 (대표 사진)
+    // 72h 이내 가장 최근 리뷰 (대표 사진, 친구 공개 리뷰 제외)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.createdAt > :since
               AND r.imageUrl IS NOT NULL
               AND r.isBlinded = false
-            ORDER BY r.helpfulCount DESC, r.createdAt DESC
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+            ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since,
             Pageable pageable);
 
-    // 시간 제한 없이 helpful_count 가장 높은 리뷰 (대표 사진, 전체 필터용)
+    // 시간 제한 없이 가장 최근 리뷰 (대표 사진, 전체 필터용, 친구 공개 리뷰 제외)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.imageUrl IS NOT NULL
               AND r.isBlinded = false
-            ORDER BY r.helpfulCount DESC, r.createdAt DESC
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+            ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findTopWithImageAllTimeByPlaceId(
             @Param("placeId") Long placeId,
             Pageable pageable);
 
-    // 72h 이전 리뷰 중 helpful_count 가장 높은 리뷰 (대표 사진, 과거 필터용)
+    // 72h 이전 리뷰 중 가장 최근 리뷰 (대표 사진, 과거 필터용, 친구 공개 리뷰 제외)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.createdAt <= :since
               AND r.imageUrl IS NOT NULL
               AND r.isBlinded = false
-            ORDER BY r.helpfulCount DESC, r.createdAt DESC
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+            ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findTopWithArchivedImageByPlaceId(
             @Param("placeId") Long placeId,
@@ -57,36 +63,70 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             Pageable pageable);
 
     // 72h 이내 리뷰 수 (상세 조회용)
-    long countByPlaceIdAndIsBlindedFalseAndCreatedAtAfter(Long placeId, LocalDateTime since);
+    // 조회자에게 실제로 보이는 리뷰만 센다. 조건은 findCurrentReviews와 동일해야
+    // 목록에 뜨는 개수와 상세의 review_count가 어긋나지 않는다.
+    @Query("""
+            SELECT COUNT(r) FROM Review r
+            WHERE r.placeId = :placeId
+              AND r.createdAt > :since
+              AND r.isBlinded = false
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS
+                   OR r.userId = :viewerId
+                   OR EXISTS (SELECT f.id FROM Follow f
+                              WHERE f.followerId = :viewerId
+                                AND f.followingId = r.userId
+                                AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
+            """)
+    long countVisibleCurrentReviews(
+            @Param("placeId") Long placeId,
+            @Param("since") LocalDateTime since,
+            @Param("viewerId") Long viewerId);
 
-    // 72h 이내 커서 기반 조회 (현재 리뷰)
+    // 72h 이내 커서 기반 조회 (현재 리뷰, 친구 공개 리뷰는 작성자 본인과 친구에게만)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.createdAt > :since
               AND r.isBlinded = false
               AND (:cursor IS NULL OR r.id < :cursor)
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS
+                   OR r.userId = :viewerId
+                   OR EXISTS (SELECT f.id FROM Follow f
+                              WHERE f.followerId = :viewerId
+                                AND f.followingId = r.userId
+                                AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
             ORDER BY r.id DESC
             """)
     List<Review> findCurrentReviews(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since,
             @Param("cursor") Long cursor,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
-    // 72h 경과 커서 기반 조회 (과거 리뷰)
+    // 72h 경과 커서 기반 조회 (과거 리뷰, 친구 공개 리뷰는 작성자 본인과 친구에게만)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId = :placeId
               AND r.createdAt <= :since
               AND r.isBlinded = false
               AND (:cursor IS NULL OR r.id < :cursor)
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS
+                   OR r.userId = :viewerId
+                   OR EXISTS (SELECT f.id FROM Follow f
+                              WHERE f.followerId = :viewerId
+                                AND f.followingId = r.userId
+                                AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
             ORDER BY r.id DESC
             """)
     List<Review> findArchivedReviews(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since,
             @Param("cursor") Long cursor,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
     // 혼잡도 집계용: 복수 장소의 72h 이내 리뷰 수 조회
@@ -104,13 +144,15 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT COUNT(DISTINCT r.placeId) FROM Review r WHERE r.userId = :userId")
     long countDistinctPlaceIdByUserId(@Param("userId") Long userId);
 
-    // 구독 목록 썸네일: 복수 장소의 72h 이내 가장 최근 이미지 URL
+    // 구독 목록 썸네일: 복수 장소의 72h 이내 가장 최근 이미지 URL (친구 공개 리뷰 제외)
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId IN :placeIds
               AND r.createdAt > :since
               AND r.imageUrl IS NOT NULL
               AND r.isBlinded = false
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
             ORDER BY r.createdAt DESC
             """)
     List<Review> findRecentReviewsWithImageByPlaceIds(
@@ -168,7 +210,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query(value = """
             SELECT r.id, p.name AS place_name, r.image_url, r.congestion_level,
                    r.comment, u.nickname AS author_nickname,
-                   r.is_blinded, r.status, r.created_at
+                   r.is_blinded, r.status, r.created_at,
+                   r.thumbnail_url, r.thumbnail_small_url
             FROM reviews r
             LEFT JOIN places p ON p.id = r.place_id
             LEFT JOIN users u ON u.id = r.user_id

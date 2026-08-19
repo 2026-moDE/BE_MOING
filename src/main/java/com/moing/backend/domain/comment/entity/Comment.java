@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public class Comment {
 
     // 답글이 달린 댓글을 삭제할 때 내용 대신 노출하는 문구
-    public static final String DELETED_CONTENT = "삭제된 댓글";
+    public static final String DELETED_CONTENT = "삭제된 댓글입니다.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

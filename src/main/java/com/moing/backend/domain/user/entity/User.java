@@ -26,7 +26,11 @@ import java.time.LocalDateTime;
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLDelete(sql = "UPDATE users SET deleted_at = NOW() WHERE id = ?")
+// 탈퇴 시 닉네임도 함께 해제해 다른 사용자가 쓸 수 있게 한다.
+// 엔티티에서 닉네임을 바꿔두는 방식은 동작하지 않는다 - Hibernate가 삭제 예정 엔티티의
+// 더티 업데이트를 건너뛰어 조용히 버려진다. 그래서 소프트 딜리트 문에 함께 넣는다.
+// id는 유일하고 짧아서 unique 제약과 varchar(20) 둘 다 안전하다.
+@SQLDelete(sql = "UPDATE users SET deleted_at = NOW(), nickname = 'deleted_' || id WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
 public class User {
 
@@ -34,8 +38,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "social_provider", nullable = false, length = 20)
-    private String socialProvider;
+    private SocialProvider socialProvider;
 
     @Column(name = "social_id", nullable = false, length = 100)
     private String socialId;
@@ -76,7 +81,7 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    public User(String socialProvider, String socialId, String nickname,
+    public User(SocialProvider socialProvider, String socialId, String nickname,
                 String profileImageUrl, String email, String fcmToken) {
         this.socialProvider = socialProvider;
         this.socialId = socialId;
@@ -105,6 +110,15 @@ public class User {
 
     public void updateProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
+    }
+
+    // 리사이즈된 프로필 이미지 URL (Lambda가 profile_original/ → profile/에 생성)
+    // 리사이즈 대상이 아닌 옛 이미지는 원본으로 폴백
+    public String getProfileUrl() {
+        if (profileImageUrl == null || !profileImageUrl.contains("/profile_original/")) {
+            return profileImageUrl;
+        }
+        return profileImageUrl.replace("/profile_original/", "/profile/");
     }
 
     // 탈퇴 후 재가입 시 계정 복구 (deleted_at 초기화 및 약관 동의 초기화)

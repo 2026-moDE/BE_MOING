@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,6 +30,10 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class SearchService {
 
+    // 키워드 없이 좌표만으로 검색할 때 적용하는 기본 반경(m).
+    // 이 값이 없으면 전체 활성 장소가 반환되어 "주변"이 되지 않는다.
+    private static final int DEFAULT_NEARBY_RADIUS_METERS = 2000;
+
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
     private final KakaoSearchService kakaoSearchService;
@@ -38,10 +43,20 @@ public class SearchService {
      * 장소 검색
      * 카카오 검색 API 호출 후 내부 DB 매칭.
      * 결과에 72h 이내 혼잡도·대표 사진을 조합한다.
+     * 키워드가 없으면 카카오를 호출하지 않고 좌표 기준 주변 장소를 DB에서 조회한다.
      */
     @Transactional
     public PlaceSearchResponse searchPlaces(Long userId, String keyword, Double latitude, Double longitude, Integer radius) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
+
+        // 카카오 키워드 검색은 query가 필수라 키워드 없이는 호출할 수 없다.
+        // 좌표까지 없으면 기준점이 없으므로 잘못된 요청으로 처리한다.
+        if (!StringUtils.hasText(keyword)) {
+            if (latitude == null || longitude == null) {
+                throw new CustomException(ErrorCode.INVALID_INPUT);
+            }
+            return nearbyFromDb(latitude, longitude, radius, since);
+        }
 
         List<PlaceSearchResponse.PlaceItem> items;
         KakaoLocalResponse kakaoResult = kakaoSearchService.search(
@@ -122,6 +137,22 @@ public class SearchService {
         return new SearchHistoryResponse(items);
     }
 
+    /**
+     * 좌표 기준 주변 장소를 DB에서 조회한다 (거리 오름차순).
+     * 카카오를 거치지 않으므로 이미 적재된 장소만 나온다.
+     */
+    private PlaceSearchResponse nearbyFromDb(double latitude, double longitude, Integer radius, LocalDateTime since) {
+        int effectiveRadius = radius != null ? radius : DEFAULT_NEARBY_RADIUS_METERS;
+
+        List<PlaceSearchResponse.PlaceItem> items = placeRepository
+                .findNearbyAll(latitude, longitude, effectiveRadius)
+                .stream()
+                .map(place -> toSearchItem(place, since))
+                .toList();
+
+        return new PlaceSearchResponse(items);
+    }
+
     private PlaceSearchResponse.PlaceItem buildSearchItem(KakaoLocalResponse.Document doc, LocalDateTime since) {
         String name = doc.placeName();
         String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
@@ -130,7 +161,7 @@ public class SearchService {
         double lng = Double.parseDouble(doc.x());
 
         // DB에 있으면 혼잡도·썸네일 포함, 없으면 upsert 후 반환
-        Optional<Place> existing = placeRepository.findByNameAndIsActiveTrue(name);
+        Optional<Place> existing = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
         if (existing.isPresent()) {
             return toSearchItem(existing.get(), since);
         }
@@ -147,7 +178,7 @@ public class SearchService {
                 .source("KAKAO")
                 .build());
 
-        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null);
+        return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null, null);
     }
 
     private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {
@@ -156,11 +187,9 @@ public class SearchService {
                 .map(Review::getCongestionLevel)
                 .orElse(null);
 
-        var thumbnailUrl = reviewRepository
+        var topReview = reviewRepository
                 .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
-                .stream().findFirst()
-                .map(Review::getImageUrl)
-                .orElse(null);
+                .stream().findFirst();
 
         return new PlaceSearchResponse.PlaceItem(
                 place.getId(),
@@ -170,7 +199,9 @@ public class SearchService {
                 place.getLatitude().doubleValue(),
                 place.getLongitude().doubleValue(),
                 congestionLevel,
-                thumbnailUrl
+                // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 원본으로 폴백
+                topReview.map(r -> r.getThumbnailUrl() != null ? r.getThumbnailUrl() : r.getImageUrl()).orElse(null),
+                topReview.map(Review::getThumbnailSmallUrl).orElse(null)
         );
     }
 }

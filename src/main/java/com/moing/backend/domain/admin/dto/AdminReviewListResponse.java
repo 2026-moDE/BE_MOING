@@ -12,12 +12,14 @@ public record AdminReviewListResponse(
         List<ReviewItem> reviews,
         @JsonProperty("next_cursor") Long nextCursor
 ) {
-    @JsonPropertyOrder({"id", "place_name", "image_url", "congestion_level", "comment",
-            "author_nickname", "status", "created_at"})
+    @JsonPropertyOrder({"id", "place_name", "image_url", "thumbnail_url", "thumbnail_small_url",
+            "congestion_level", "comment", "author_nickname", "status", "created_at"})
     public record ReviewItem(
             Long id,
             @JsonProperty("place_name") String placeName,
             @JsonProperty("image_url") String imageUrl,
+            @JsonProperty("thumbnail_url") String thumbnailUrl,
+            @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl,
             @JsonProperty("congestion_level") String congestionLevel,
             String comment,
             @JsonProperty("author_nickname") String authorNickname,

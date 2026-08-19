@@ -6,7 +6,6 @@ import com.moing.backend.domain.comment.dto.CommentListResponse;
 import com.moing.backend.domain.comment.dto.ReplyCreateRequest;
 import com.moing.backend.domain.comment.entity.Comment;
 import com.moing.backend.domain.comment.repository.CommentRepository;
-import com.moing.backend.domain.comment.util.DeletedCommentNickname;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
@@ -204,7 +203,7 @@ public class CommentService {
     private CommentListResponse.CommentItem toItem(Comment comment, Long viewerId, Long reviewAuthorId,
                                                    Map<Long, User> userMap,
                                                    List<CommentListResponse.CommentItem> replies) {
-        // 삭제된 댓글은 작성자를 감추고 댓글 id로 만든 랜덤 닉네임 + 기본 이미지(null)로 대체한다.
+        // 삭제된 댓글은 작성자를 감추고 고정 문구 + 기본 이미지(null)로 대체한다.
         // 자리표시용이므로 is_secret / is_mine 도 내려 삭제 버튼이나 비밀 댓글 표시가 뜨지 않게 한다.
         if (comment.isDeleted()) {
             return new CommentListResponse.CommentItem(
@@ -214,7 +213,7 @@ public class CommentService {
                     false,
                     false,
                     true,
-                    new CommentListResponse.UserInfo(DeletedCommentNickname.of(comment.getId()), null, null),
+                    new CommentListResponse.UserInfo(Comment.DELETED_NICKNAME, null, null),
                     comment.getCreatedAt(),
                     replies
             );

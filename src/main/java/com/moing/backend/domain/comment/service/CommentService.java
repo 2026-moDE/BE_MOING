@@ -6,6 +6,7 @@ import com.moing.backend.domain.comment.dto.CommentListResponse;
 import com.moing.backend.domain.comment.dto.ReplyCreateRequest;
 import com.moing.backend.domain.comment.entity.Comment;
 import com.moing.backend.domain.comment.repository.CommentRepository;
+import com.moing.backend.domain.comment.util.DeletedCommentNickname;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
@@ -81,6 +82,10 @@ public class CommentService {
         }
         if (parent.isReply()) {
             throw new CustomException(ErrorCode.NESTED_REPLY_NOT_ALLOWED);
+        }
+        // 자리표시만 남은 댓글에는 답글을 이어 달 수 없다
+        if (parent.isDeleted()) {
+            throw new CustomException(ErrorCode.DELETED_COMMENT_REPLY_NOT_ALLOWED);
         }
 
         Comment reply = commentRepository.save(Comment.builder()
@@ -199,6 +204,22 @@ public class CommentService {
     private CommentListResponse.CommentItem toItem(Comment comment, Long viewerId, Long reviewAuthorId,
                                                    Map<Long, User> userMap,
                                                    List<CommentListResponse.CommentItem> replies) {
+        // 삭제된 댓글은 작성자를 감추고 댓글 id로 만든 랜덤 닉네임 + 기본 이미지(null)로 대체한다.
+        // 자리표시용이므로 is_secret / is_mine 도 내려 삭제 버튼이나 비밀 댓글 표시가 뜨지 않게 한다.
+        if (comment.isDeleted()) {
+            return new CommentListResponse.CommentItem(
+                    comment.getId(),
+                    comment.getParentId(),
+                    Comment.DELETED_CONTENT,
+                    false,
+                    false,
+                    true,
+                    new CommentListResponse.UserInfo(DeletedCommentNickname.of(comment.getId()), null, null),
+                    comment.getCreatedAt(),
+                    replies
+            );
+        }
+
         User author = userMap.get(comment.getUserId());
         CommentListResponse.UserInfo userInfo = author != null
                 ? new CommentListResponse.UserInfo(author.getNickname(), author.getProfileImageUrl(), author.getProfileUrl())
@@ -207,14 +228,9 @@ public class CommentService {
         boolean isMine = viewerId.equals(comment.getUserId());
 
         // 비밀 댓글 내용은 리뷰 작성자와 댓글 작성자에게만 노출한다
-        String content;
-        if (comment.isDeleted()) {
-            content = comment.getContent();
-        } else if (comment.isSecret() && !isMine && !viewerId.equals(reviewAuthorId)) {
-            content = null;
-        } else {
-            content = comment.getContent();
-        }
+        String content = comment.isSecret() && !isMine && !viewerId.equals(reviewAuthorId)
+                ? null
+                : comment.getContent();
 
         return new CommentListResponse.CommentItem(
                 comment.getId(),

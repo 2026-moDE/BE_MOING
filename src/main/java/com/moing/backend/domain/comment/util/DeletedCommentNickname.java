@@ -30,9 +30,19 @@ public final class DeletedCommentNickname {
             return FALLBACK;
         }
 
-        long id = Math.abs(commentId);
-        String adjective = ADJECTIVES[(int) (id % ADJECTIVES.length)];
-        String noun = NOUNS[(int) ((id / ADJECTIVES.length) % NOUNS.length)];
+        // id를 그대로 쓰면 1, 2, 3번 댓글이 "느긋한 너구리", "성실한 너구리"처럼
+        // 명사가 붙어버린다. 한 리뷰의 댓글 id는 대체로 연속이라 섞어서 뽑는다.
+        long hash = mix(commentId);
+        String adjective = ADJECTIVES[(int) Math.floorMod(hash, ADJECTIVES.length)];
+        String noun = NOUNS[(int) Math.floorMod(hash / ADJECTIVES.length, NOUNS.length)];
         return adjective + " " + noun;
+    }
+
+    // splitmix64 finalizer - 이웃한 id가 전혀 다른 값으로 흩어지게 한다
+    private static long mix(long value) {
+        long hash = value * 0x9E3779B97F4A7C15L;
+        hash = (hash ^ (hash >>> 30)) * 0xBF58476D1CE4E5B9L;
+        hash = (hash ^ (hash >>> 27)) * 0x94D049BB133111EBL;
+        return hash ^ (hash >>> 31);
     }
 }

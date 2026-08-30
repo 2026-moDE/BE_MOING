@@ -16,6 +16,12 @@ spring:
           time_zone: Asia/Seoul
     show-sql: true
 
+  # 스케줄러 기본값이 단일 스레드라, AI 검열 호출이 늦어지면 혼잡도 갱신까지 함께 밀린다
+  task:
+    scheduling:
+      pool:
+        size: 2
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 3600000
@@ -61,3 +67,17 @@ springdoc:
     operations-sorter: alpha
   api-docs:
     path: /v3/api-docs
+# 댓글 AI 검열 (스케줄러가 백그라운드로 돌며 결과만 쌓는다. 댓글 작성 경로와 무관)
+ai:
+  moderation:
+    # 키가 없거나 팀원 로컬에서는 꺼둔다. 켜야만 호출이 나간다
+    enabled: ${AI_MODERATION_ENABLED:false}
+    api-key: ${AI_MODERATION_API_KEY:}
+    base-url: ${AI_MODERATION_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    # 콘솔에서 확인한 모델 이름으로 맞출 것
+    model: ${AI_MODERATION_MODEL:gemini-2.5-flash-lite}
+    # 한 번의 호출에 묶어 보낼 댓글 수
+    batch-size: ${AI_MODERATION_BATCH_SIZE:20}
+    # 무료 티어 한도를 넘지 않도록 자체 상한을 둔다
+    daily-call-limit: ${AI_MODERATION_DAILY_CALL_LIMIT:800}
+    timeout-seconds: ${AI_MODERATION_TIMEOUT_SECONDS:20}

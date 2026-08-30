@@ -1,6 +1,7 @@
 package com.moing.backend.domain.place.repository;
 
 import com.moing.backend.domain.place.entity.Place;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,8 +12,12 @@ import java.util.Optional;
 
 public interface PlaceRepository extends JpaRepository<Place, Long> {
 
-    /** 장소명으로 활성 장소를 조회한다 (네이버 검색 결과 매칭용) */
-    Optional<Place> findByNameAndIsActiveTrue(String name);
+    /**
+     * 장소명으로 활성 장소를 조회한다 (검색 결과 매칭용)
+     * name에 unique 제약이 없어 동시 삽입으로 중복 행이 생길 수 있으므로,
+     * 단건 조회 대신 가장 먼저 생성된 행을 반환한다.
+     */
+    Optional<Place> findFirstByNameAndIsActiveTrueOrderByIdAsc(String name);
 
     /** 전체 활성 장소를 조회한다 */
     List<Place> findAllByIsActiveTrue();
@@ -144,4 +149,24 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     /** 장소명 목록으로 활성 장소를 일괄 조회한다 (자동완성 N+1 방지) */
     List<Place> findByNameInAndIsActiveTrue(List<String> names);
+
+    /** 활성 장소 수 (관리자 통계) */
+    long countByIsActiveTrue();
+
+    /** 관리자 장소 목록 (review_count 포함, keyword 검색, N+1 방지) */
+    @Query(value = """
+            SELECT p.id, p.name, p.address, p.category,
+                   COUNT(r.id) AS review_count, p.is_active, p.created_at
+            FROM places p
+            LEFT JOIN reviews r ON r.place_id = p.id
+            WHERE (:cursor IS NULL OR p.id < :cursor)
+              AND (:keyword IS NULL
+                   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(p.address) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            GROUP BY p.id
+            ORDER BY p.id DESC
+            """, nativeQuery = true)
+    List<Object[]> findAdminPlaces(@Param("keyword") String keyword,
+                                   @Param("cursor") Long cursor,
+                                   Pageable pageable);
 }

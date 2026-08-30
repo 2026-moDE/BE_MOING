@@ -41,11 +41,21 @@ public class Review {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "thumbnail_url", length = 500)
+    private String thumbnailUrl;
+
+    @Column(name = "thumbnail_small_url", length = 500)
+    private String thumbnailSmallUrl;
+
     @Column(name = "latitude", precision = 10, scale = 7)
     private BigDecimal latitude;
 
     @Column(name = "longitude", precision = 10, scale = 7)
     private BigDecimal longitude;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", length = 20)
+    private Visibility visibility;
 
     @Column(name = "status", nullable = false, length = 20)
     private String status;
@@ -66,18 +76,40 @@ public class Review {
     @Builder
     public Review(Long userId, Long placeId, CongestionLevel congestionLevel,
                   String quickTag, String comment, String imageUrl,
-                  BigDecimal latitude, BigDecimal longitude) {
+                  BigDecimal latitude, BigDecimal longitude, Visibility visibility) {
         this.userId = userId;
         this.placeId = placeId;
         this.congestionLevel = congestionLevel;
         this.quickTag = quickTag;
         this.comment = comment;
         this.imageUrl = imageUrl;
+        this.thumbnailUrl = generateThumbnailUrl(imageUrl, "thumbnail");
+        this.thumbnailSmallUrl = generateThumbnailUrl(imageUrl, "thumbnail_small");
         this.latitude = latitude;
         this.longitude = longitude;
+        this.visibility = visibility != null ? visibility : Visibility.PUBLIC;
         this.status = "ACTIVE";
         this.isBlinded = false;
         this.helpfulCount = 0;
         this.viewCount = 0;
+    }
+
+    private static String generateThumbnailUrl(String imageUrl, String folder) {
+        if (imageUrl == null || !imageUrl.contains("/original/")) {
+            return null;
+        }
+        return imageUrl.replace("/original/", "/" + folder + "/");
+    }
+
+    public void blind() {
+        this.isBlinded = true;
+    }
+
+    public void unblind() {
+        this.isBlinded = false;
+    }
+
+    public void updateComment(String comment) {
+        this.comment = comment;
     }
 }

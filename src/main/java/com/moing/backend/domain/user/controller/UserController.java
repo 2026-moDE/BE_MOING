@@ -6,6 +6,7 @@ import com.moing.backend.domain.user.dto.UserProfileResponse;
 import com.moing.backend.domain.user.dto.UserPublicProfileResponse;
 import com.moing.backend.domain.user.dto.UserReviewListResponse;
 import com.moing.backend.domain.user.dto.SubscriptionListResponse;
+import com.moing.backend.domain.user.dto.UnreadNotificationResponse;
 import com.moing.backend.domain.user.dto.UserUpdateRequest;
 import com.moing.backend.domain.user.dto.UserUpdateResponse;
 import com.moing.backend.domain.user.service.UserService;
@@ -50,6 +51,14 @@ public class UserController {
     ) {
         return ResponseEntity.ok(ApiResponse.success("success",
                 userService.getMyNotifications(userId, cursor, limit)));
+    }
+
+    @GetMapping("/me/notifications/unread")
+    public ResponseEntity<ApiResponse<UnreadNotificationResponse>> hasUnreadNotifications(
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                userService.hasUnreadNotifications(userId)));
     }
 
     @PatchMapping("/me")

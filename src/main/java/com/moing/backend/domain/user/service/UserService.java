@@ -18,6 +18,7 @@ import com.moing.backend.domain.user.dto.UserPublicProfileResponse;
 import com.moing.backend.domain.user.dto.UserReviewItem;
 import com.moing.backend.domain.user.dto.UserReviewListResponse;
 import com.moing.backend.domain.user.dto.SubscriptionListResponse;
+import com.moing.backend.domain.user.dto.UnreadNotificationResponse;
 import com.moing.backend.domain.user.dto.UserUpdateRequest;
 import com.moing.backend.domain.user.dto.UserUpdateResponse;
 import com.moing.backend.domain.user.entity.User;
@@ -243,6 +244,10 @@ public class UserService {
         }).toList();
 
         return new NotificationListResponse(items, nextCursor);
+    }
+
+    public UnreadNotificationResponse hasUnreadNotifications(Long userId) {
+        return new UnreadNotificationResponse(notificationRepository.existsUnread(userId));
     }
 
     @Transactional

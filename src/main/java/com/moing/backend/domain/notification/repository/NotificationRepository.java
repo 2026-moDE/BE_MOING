@@ -20,4 +20,13 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("userId") Long userId,
             @Param("cursor") Long cursor,
             Pageable pageable);
+
+    // 미읽음 알림 존재 여부. 파생 쿼리 이름(...IsReadFalse)은 boolean 필드 isRead를
+    // read로 볼지 isRead로 볼지 모호해서 JPQL로 명시한다
+    @Query("""
+            SELECT COUNT(n) > 0 FROM Notification n
+            WHERE n.userId = :userId
+              AND n.isRead = false
+            """)
+    boolean existsUnread(@Param("userId") Long userId);
 }

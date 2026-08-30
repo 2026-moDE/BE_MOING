@@ -1,5 +1,6 @@
 package com.moing.backend.domain.place.service;
 
+import com.moing.backend.domain.place.dto.HotPlaceResponse;
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.KakaoLocalResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
@@ -46,6 +47,13 @@ public class PlaceService {
     // 키워드 없이 좌표만으로 검색할 때 적용하는 반경(m).
     // 이 값이 없으면 전체 활성 장소가 반환되어 "주변"이 되지 않는다.
     private static final int DEFAULT_NEARBY_RADIUS_METERS = 2000;
+
+    // 인기 장소로 노출할 최소 리뷰 수(72h 기준)와 한 번에 내려줄 수 있는 최대 개수
+    private static final int HOT_PLACE_MIN_REVIEWS = 2;
+    private static final int HOT_PLACE_MAX_LIMIT = 20;
+
+    // 장소당 내려주는 리뷰 사진 최대 개수 (최신순)
+    private static final int HOT_PLACE_MAX_IMAGES = 4;
 
     private final PlaceRepository placeRepository;
     private final ReviewRepository reviewRepository;
@@ -237,6 +245,66 @@ public class PlaceService {
                 .toList();
 
         return new PlaceNearbyResponse(items);
+    }
+
+    /**
+     * 인기 장소 조회
+     * 72h 이내 리뷰가 {@value #HOT_PLACE_MIN_REVIEWS}개 이상인 장소를 현재 위치에서 가까운 순으로 반환한다.
+     *
+     * 로그인 사용자 구분 없이 같은 목록을 내려주므로 친구 공개 리뷰는 집계에서 제외한다.
+     */
+    public HotPlaceResponse getHotPlaces(double latitude, double longitude, int limit) {
+        int size = Math.max(1, Math.min(limit, HOT_PLACE_MAX_LIMIT));
+        LocalDateTime since = LocalDateTime.now().minusHours(72);
+
+        List<Place> places = placeRepository.findHotPlaces(
+                latitude, longitude, since, HOT_PLACE_MIN_REVIEWS, PageRequest.of(0, size));
+
+        if (places.isEmpty()) {
+            return new HotPlaceResponse(List.of());
+        }
+
+        Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
+
+        // 장소별 최신순 리뷰. groupingBy는 정렬 순서를 유지하므로 첫 원소가 최신 리뷰다.
+        Map<Long, List<Review>> reviewsByPlace = reviewRepository
+                .findVisibleRecentReviewsByPlaceIds(places.stream().map(Place::getId).toList(), since)
+                .stream()
+                .collect(Collectors.groupingBy(Review::getPlaceId));
+
+        List<HotPlaceResponse.PlaceItem> items = places.stream()
+                .map(place -> toHotItem(place, reviewsByPlace.getOrDefault(place.getId(), List.of()),
+                        cacheMap.get(place.getId())))
+                .toList();
+
+        return new HotPlaceResponse(items);
+    }
+
+    // 인기 장소 응답 DTO 변환 (리뷰 수·최신 리뷰·사진 목록을 recentReviews에서 모두 뽑는다)
+    private HotPlaceResponse.PlaceItem toHotItem(Place place, List<Review> recentReviews,
+                                                 PlaceCongestionCache cache) {
+        // 사진이 달린 리뷰만 최신순으로 추린다 (최신 리뷰에 사진이 없을 수 있다)
+        List<HotPlaceResponse.ReviewImage> images = recentReviews.stream()
+                .filter(r -> r.getImageUrl() != null)
+                .limit(HOT_PLACE_MAX_IMAGES)
+                .map(r -> new HotPlaceResponse.ReviewImage(
+                        // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 원본으로 폴백
+                        r.getThumbnailUrl() != null ? r.getThumbnailUrl() : r.getImageUrl(),
+                        r.getThumbnailSmallUrl()))
+                .toList();
+
+        return new HotPlaceResponse.PlaceItem(
+                place.getId(),
+                place.getName(),
+                place.getCategory(),
+                cache != null ? cache.getCongestionLevel() : null,
+                recentReviews.size(),
+                images,
+                recentReviews.stream()
+                        .findFirst()
+                        .map(r -> new HotPlaceResponse.LatestReview(r.getComment(), r.getCreatedAt()))
+                        .orElse(null)
+        );
     }
 
     /**

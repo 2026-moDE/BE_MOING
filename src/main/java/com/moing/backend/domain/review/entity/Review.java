@@ -60,14 +60,14 @@ public class Review {
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
+    @Column(name = "is_blinded", nullable = false)
+    private boolean isBlinded;
+
     @Column(name = "helpful_count", nullable = false)
     private int helpfulCount;
 
     @Column(name = "view_count", nullable = false)
     private int viewCount;
-
-    @Column(name = "is_blinded", nullable = false)
-    private boolean isBlinded;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -89,9 +89,9 @@ public class Review {
         this.longitude = longitude;
         this.visibility = visibility != null ? visibility : Visibility.PUBLIC;
         this.status = "ACTIVE";
+        this.isBlinded = false;
         this.helpfulCount = 0;
         this.viewCount = 0;
-        this.isBlinded = false;
     }
 
     private static String generateThumbnailUrl(String imageUrl, String folder) {

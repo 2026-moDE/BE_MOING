@@ -1,5 +1,6 @@
 package com.moing.backend.domain.place.controller;
 
+import com.moing.backend.domain.place.dto.HotPlaceResponse;
 import com.moing.backend.domain.place.dto.LocationVerifyResponse;
 import com.moing.backend.domain.place.dto.PlaceDetailResponse;
 import com.moing.backend.domain.place.dto.PlaceNearbyResponse;
@@ -82,6 +83,17 @@ public class PlaceController {
             @RequestParam(defaultValue = "all") String filter
     ) {
         return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query, filter));
+    }
+
+    // 인기 장소 (72h 이내 리뷰 2개 이상, 현재 위치에서 가까운 순)
+    @GetMapping("/hot")
+    public ResponseEntity<ApiResponse<HotPlaceResponse>> getHotPlaces(
+            @RequestParam double latitude,
+            @RequestParam double longitude,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                placeService.getHotPlaces(latitude, longitude, limit)));
     }
 
     // 좌표의 행정동 조회 (현재 위치 표시용)

@@ -61,9 +61,10 @@ public class Comment {
         return parentId != null;
     }
 
-    // 답글이 달려 있어 실제로 지울 수 없는 댓글은 내용만 치환한다
+    // 답글이 달려 있어 실제로 지울 수 없는 댓글은 플래그만 세운다.
+    // 내용은 그대로 두되 응답에서 DELETED_CONTENT로 가리므로 유저에게는 노출되지 않고,
+    // 관리자는 어떤 댓글을 내렸는지 확인할 수 있다.
     public void softDelete() {
         this.isDeleted = true;
-        this.content = DELETED_CONTENT;
     }
 }

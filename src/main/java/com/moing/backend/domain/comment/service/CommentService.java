@@ -148,7 +148,9 @@ public class CommentService {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
-        // 답글이 달린 댓글은 parent_id FK 때문에 지울 수 없으므로 내용만 치환한다
+        // 답글이 달린 댓글을 실제로 지우면 그 답글의 parent_id가 없는 id를 가리키게 되고,
+        // 최상위 조회에도 답글 조회에도 걸리지 않아 아무 화면에 안 나오는 유령으로 남는다.
+        // 그래서 자리표시만 남긴다. (DB에 FK가 걸려 있지는 않아 지우는 것 자체는 막히지 않는다)
         if (commentRepository.existsByParentId(comment.getId())) {
             comment.softDelete();
         } else {

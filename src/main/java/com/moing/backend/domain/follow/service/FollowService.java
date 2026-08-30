@@ -1,5 +1,6 @@
 package com.moing.backend.domain.follow.service;
 
+import com.moing.backend.domain.follow.dto.FriendFeedResponse;
 import com.moing.backend.domain.follow.dto.FriendRequestResponse;
 import com.moing.backend.domain.follow.dto.FriendResponse;
 import com.moing.backend.domain.follow.dto.UserSearchResponse;
@@ -8,6 +9,10 @@ import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
 import com.moing.backend.domain.notification.service.NotificationService;
+import com.moing.backend.domain.place.entity.Place;
+import com.moing.backend.domain.place.repository.PlaceRepository;
+import com.moing.backend.domain.review.entity.Review;
+import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
 import com.moing.backend.global.exception.CustomException;
@@ -21,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.moing.backend.domain.follow.util.ChosungUtil;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,8 +38,11 @@ public class FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final ReviewRepository reviewRepository;
+    private final PlaceRepository placeRepository;
 
     private static final int SEARCH_LIMIT = 20;
+    private static final int FEED_MAX_LIMIT = 50;
 
     @Transactional
     public void sendFollowRequest(Long followerId, Long followingId) {
@@ -214,5 +223,77 @@ public class FollowService {
                     User user = userMap.get(f.getFollowingId());
                     return new FriendResponse(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl());
                 }).toList();
+    }
+
+    /**
+     * 친구 최근 리뷰 피드
+     * 수락된 친구들이 72h 이내 작성한 리뷰를 최신순으로 반환한다.
+     * 이미 친구인 사람의 리뷰만 보므로 친구 공개(FRIENDS) 리뷰도 포함한다.
+     */
+    @Transactional(readOnly = true)
+    public FriendFeedResponse getFriendFeed(Long userId, int limit) {
+        int size = Math.max(1, Math.min(limit, FEED_MAX_LIMIT));
+
+        List<Long> friendIds = followRepository.findByFollowerIdAndStatus(userId, FollowStatus.ACCEPTED)
+                .stream().map(Follow::getFollowingId).toList();
+        if (friendIds.isEmpty()) {
+            return new FriendFeedResponse(List.of());
+        }
+
+        // 탈퇴 유저는 @SQLRestriction으로 걸러지므로, 조회 전에 살아 있는 친구만 남긴다.
+        // 리뷰를 가져온 뒤에 거르면 탈퇴 친구의 리뷰가 limit을 차지해 응답이 모자라진다.
+        Map<Long, User> userMap = userRepository.findAllById(friendIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        if (userMap.isEmpty()) {
+            return new FriendFeedResponse(List.of());
+        }
+
+        List<Review> reviews = reviewRepository.findFriendFeed(
+                List.copyOf(userMap.keySet()),
+                LocalDateTime.now().minusHours(72),
+                PageRequest.of(0, size));
+        if (reviews.isEmpty()) {
+            return new FriendFeedResponse(List.of());
+        }
+
+        // 장소명을 한 번에 조회 (N+1 방지)
+        Map<Long, Place> placeMap = placeRepository.findAllById(
+                        reviews.stream().map(Review::getPlaceId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Place::getId, p -> p));
+
+        List<FriendFeedResponse.ReviewItem> items = reviews.stream()
+                .map(r -> {
+                    User author = userMap.get(r.getUserId());
+                    Place place = placeMap.get(r.getPlaceId());
+                    return new FriendFeedResponse.ReviewItem(
+                            r.getId(),
+                            r.getPlaceId(),
+                            place != null ? place.getName() : null,
+                            r.getCongestionLevel(),
+                            r.getComment(),
+                            r.getImageUrl(),
+                            r.getThumbnailUrl(),
+                            // 피드의 사진 동그라미가 thumbnail_small_url로 그려진다.
+                            // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 이 값이 null이라
+                            // 사진이 있는데도 동그라미가 비므로 큰 썸네일 -> 원본 순으로 폴백한다
+                            firstNonNull(r.getThumbnailSmallUrl(), r.getThumbnailUrl(), r.getImageUrl()),
+                            new FriendFeedResponse.UserInfo(
+                                    author.getId(), author.getNickname(), author.getProfileUrl()),
+                            r.getCreatedAt()
+                    );
+                })
+                .toList();
+
+        return new FriendFeedResponse(items);
+    }
+
+    private static String firstNonNull(String... urls) {
+        for (String url : urls) {
+            if (url != null) {
+                return url;
+            }
+        }
+        return null;
     }
 }

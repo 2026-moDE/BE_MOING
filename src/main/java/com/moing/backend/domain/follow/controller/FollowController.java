@@ -1,5 +1,6 @@
 package com.moing.backend.domain.follow.controller;
 
+import com.moing.backend.domain.follow.dto.FriendFeedResponse;
 import com.moing.backend.domain.follow.dto.FriendRequestResponse;
 import com.moing.backend.domain.follow.dto.FriendResponse;
 import com.moing.backend.domain.follow.dto.UserSearchResponse;
@@ -77,5 +78,14 @@ public class FollowController {
             @AuthenticationPrincipal Long userId
     ) {
         return ResponseEntity.ok(ApiResponse.success(followService.getFriends(userId)));
+    }
+
+    // 친구 최근 리뷰 피드 (72h 이내, 최신순)
+    @GetMapping("/feed")
+    public ResponseEntity<ApiResponse<FriendFeedResponse>> getFriendFeed(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(followService.getFriendFeed(userId, limit)));
     }
 }

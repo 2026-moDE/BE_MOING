@@ -31,6 +31,39 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             """)
     List<Comment> findRepliesByParentIds(@Param("parentIds") List<Long> parentIds);
 
-    // 답글 존재 여부 (삭제 방식 결정용, FK 제약 때문에 소프트 삭제된 답글도 포함해야 한다)
+    // 답글 존재 여부 (삭제 방식 결정용, 소프트 삭제된 답글도 부모를 붙들고 있으므로 포함한다)
     boolean existsByParentId(Long parentId);
+
+    // 아직 AI 검열을 거치지 않은 댓글 (오래된 것부터). 삭제된 댓글은 검사하지 않는다
+    @Query(value = """
+            SELECT c.id, c.content
+            FROM comments c
+            LEFT JOIN comment_moderations m ON m.comment_id = c.id
+            WHERE m.id IS NULL
+              AND c.is_deleted = false
+            ORDER BY c.id ASC
+            """, nativeQuery = true)
+    List<Object[]> findUncheckedComments(Pageable pageable);
+
+    // 관리자 댓글 목록 (author_nickname, place_name 조인, 삭제된 댓글 포함)
+    // users를 네이티브로 조인해야 탈퇴 유저(@SQLRestriction 대상)의 닉네임도 남는다
+    @Query(value = """
+            SELECT c.id, c.review_id, c.parent_id, c.content,
+                   u.nickname AS author_nickname, p.name AS place_name,
+                   c.is_secret, c.is_deleted, c.created_at
+            FROM comments c
+            LEFT JOIN users u ON u.id = c.user_id
+            LEFT JOIN reviews r ON r.id = c.review_id
+            LEFT JOIN places p ON p.id = r.place_id
+            WHERE (:cursor IS NULL OR c.id < :cursor)
+              AND (:keyword IS NULL OR c.content LIKE CONCAT('%', :keyword, '%'))
+              AND (:filterStatus IS NULL
+                   OR (:filterStatus = 'DELETED' AND c.is_deleted = true)
+                   OR (:filterStatus = 'ACTIVE' AND c.is_deleted = false))
+            ORDER BY c.id DESC
+            """, nativeQuery = true)
+    List<Object[]> findAdminComments(@Param("filterStatus") String filterStatus,
+                                     @Param("keyword") String keyword,
+                                     @Param("cursor") Long cursor,
+                                     Pageable pageable);
 }

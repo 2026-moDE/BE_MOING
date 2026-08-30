@@ -1,5 +1,6 @@
 package com.moing.backend.domain.admin.controller;
 
+import com.moing.backend.domain.admin.dto.AdminCommentListResponse;
 import com.moing.backend.domain.admin.dto.AdminLoginRequest;
 import com.moing.backend.domain.admin.dto.AdminLoginResponse;
 import com.moing.backend.domain.admin.dto.AdminReportListResponse;
@@ -11,6 +12,7 @@ import com.moing.backend.domain.admin.dto.AdminPlaceUpdateRequest;
 import com.moing.backend.domain.admin.dto.AdminStatsResponse;
 import com.moing.backend.domain.admin.dto.AdminUserListResponse;
 import com.moing.backend.domain.admin.service.AdminAuthService;
+import com.moing.backend.domain.admin.service.AdminCommentService;
 import com.moing.backend.domain.admin.service.AdminPlaceService;
 import com.moing.backend.domain.admin.service.AdminReportService;
 import com.moing.backend.domain.admin.service.AdminReviewService;
@@ -25,6 +27,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final AdminAuthService adminAuthService;
+    private final AdminCommentService adminCommentService;
     private final AdminStatsService adminStatsService;
     private final AdminPlaceService adminPlaceService;
     private final AdminReportService adminReportService;
@@ -101,6 +105,24 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody @Valid AdminReviewBlindRequest request) {
         adminReviewService.blindReview(id, request.getStatus());
+        return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
+    }
+
+    @Operation(summary = "댓글 목록 조회", description = "댓글 목록을 커서 기반 페이지네이션으로 조회합니다. status 필터(ACTIVE/DELETED)와 keyword 내용 검색 선택 가능.")
+    @GetMapping("/comments")
+    public ResponseEntity<ApiResponse<AdminCommentListResponse>> getComments(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                adminCommentService.getComments(status, keyword, cursor, limit)));
+    }
+
+    @Operation(summary = "댓글 내리기", description = "댓글을 삭제 처리합니다. 되돌릴 수 없습니다.")
+    @DeleteMapping("/comments/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable Long id) {
+        adminCommentService.deleteComment(id);
         return ResponseEntity.ok(ApiResponse.success("처리 완료", null));
     }
 

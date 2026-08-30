@@ -176,6 +176,20 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("placeIds") List<Long> placeIds,
             @Param("since") LocalDateTime since);
 
+    // 친구 피드: 친구들이 72h 이내 쓴 리뷰 (최신순)
+    // 이미 수락된 친구만 대상이므로 친구 공개(FRIENDS) 리뷰도 걸러내지 않는다
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.userId IN :userIds
+              AND r.createdAt > :since
+              AND r.isBlinded = false
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<Review> findFriendFeed(
+            @Param("userIds") List<Long> userIds,
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
+
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag AND r.isBlinded = false")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);

@@ -160,6 +160,22 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("placeIds") List<Long> placeIds,
             @Param("since") LocalDateTime since);
 
+    // 인기 장소: 복수 장소의 72h 이내 노출 가능한 리뷰 (장소별 최신 순)
+    // 리뷰 수·최신 리뷰·대표 사진을 이 한 번의 조회로 모두 뽑는다.
+    // 조건은 PlaceRepository.findHotPlaces의 카운트 조건과 반드시 같아야 한다.
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.placeId IN :placeIds
+              AND r.createdAt > :since
+              AND r.isBlinded = false
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<Review> findVisibleRecentReviewsByPlaceIds(
+            @Param("placeIds") List<Long> placeIds,
+            @Param("since") LocalDateTime since);
+
     // quick_tag로 장소 ID 검색
     @Query("SELECT DISTINCT r.placeId FROM Review r WHERE r.quickTag = :tag AND r.isBlinded = false")
     List<Long> findPlaceIdsByQuickTag(@Param("tag") String tag);

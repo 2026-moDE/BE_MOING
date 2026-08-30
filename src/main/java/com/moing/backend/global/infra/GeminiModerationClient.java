@@ -1,7 +1,9 @@
 package com.moing.backend.global.infra;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+// Boot 4가 빈으로 등록하는 것은 Jackson 3(tools.jackson)이다.
+// com.fasterxml.jackson.databind는 다른 라이브러리에 딸려 클래스패스에만 있고 빈은 없다
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;

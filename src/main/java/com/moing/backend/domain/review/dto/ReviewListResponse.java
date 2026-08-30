@@ -13,6 +13,8 @@ public record ReviewListResponse(
         @JsonProperty("next_cursor") Long nextCursor
 ) {
     public record UserInfo(
+            // 프로필 조회(GET /api/users/{userId}) 호출에 필요하다. 상세 조회 응답과 형태를 맞춘다
+            @JsonProperty("user_id") Long userId,
             String nickname,
             @JsonProperty("profile_image_url") String profileImageUrl,
             @JsonProperty("profile_url") String profileUrl

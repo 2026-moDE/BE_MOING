@@ -215,7 +215,7 @@ public class CommentService {
                     false,
                     false,
                     true,
-                    new CommentListResponse.UserInfo(Comment.DELETED_NICKNAME, null, null),
+                    new CommentListResponse.UserInfo(null, Comment.DELETED_NICKNAME, null, null),
                     comment.getCreatedAt(),
                     replies
             );
@@ -223,8 +223,8 @@ public class CommentService {
 
         User author = userMap.get(comment.getUserId());
         CommentListResponse.UserInfo userInfo = author != null
-                ? new CommentListResponse.UserInfo(author.getNickname(), author.getProfileImageUrl(), author.getProfileUrl())
-                : new CommentListResponse.UserInfo("알 수 없음", null, null);
+                ? new CommentListResponse.UserInfo(author.getId(), author.getNickname(), author.getProfileImageUrl(), author.getProfileUrl())
+                : new CommentListResponse.UserInfo(comment.getUserId(), "알 수 없음", null, null);
 
         boolean isMine = viewerId.equals(comment.getUserId());
 

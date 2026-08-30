@@ -12,7 +12,15 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
     show-sql: true
+
+  # 스케줄러 기본값이 단일 스레드라, AI 검열 호출이 늦어지면 혼잡도 갱신까지 함께 밀린다
+  task:
+    scheduling:
+      pool:
+        size: 2
 
 jwt:
   secret: ${JWT_SECRET}
@@ -22,6 +30,18 @@ jwt:
 kakao:
   api-key: ${KAKAO_API_KEY:}
   user-info-url: https://kapi.kakao.com/v2/user/me
+
+# 구글/애플은 앱이 보낸 ID token(JWT)을 서버가 검증한다.
+# client-ids는 토큰의 aud와 대조할 값으로, iOS/안드로이드 client id가 다르면 콤마로 나열한다.
+google:
+  client-ids: ${GOOGLE_CLIENT_IDS:}
+  jwks-url: https://www.googleapis.com/oauth2/v3/certs
+  issuer: https://accounts.google.com
+
+apple:
+  client-ids: ${APPLE_CLIENT_IDS:}
+  jwks-url: https://appleid.apple.com/auth/keys
+  issuer: https://appleid.apple.com
 
 naver:
   api-key-id: ${NAVER_API_KEY_ID:}
@@ -47,3 +67,17 @@ springdoc:
     operations-sorter: alpha
   api-docs:
     path: /v3/api-docs
+# 댓글 AI 검열 (스케줄러가 백그라운드로 돌며 결과만 쌓는다. 댓글 작성 경로와 무관)
+ai:
+  moderation:
+    # 키가 없거나 팀원 로컬에서는 꺼둔다. 켜야만 호출이 나간다
+    enabled: ${AI_MODERATION_ENABLED:false}
+    api-key: ${AI_MODERATION_API_KEY:}
+    base-url: ${AI_MODERATION_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    # 콘솔에서 확인한 모델 이름으로 맞출 것
+    model: ${AI_MODERATION_MODEL:gemini-2.5-flash-lite}
+    # 한 번의 호출에 묶어 보낼 댓글 수
+    batch-size: ${AI_MODERATION_BATCH_SIZE:20}
+    # 무료 티어 한도를 넘지 않도록 자체 상한을 둔다
+    daily-call-limit: ${AI_MODERATION_DAILY_CALL_LIMIT:800}
+    timeout-seconds: ${AI_MODERATION_TIMEOUT_SECONDS:20}

@@ -33,4 +33,16 @@ public enum PlaceCategory {
 
         return ETC;
     }
+
+    // 카카오 category_group_code를 분석해 Enum 반환
+    public static PlaceCategory fromKakaoCategoryCode(String code) {
+        if (code == null) return ETC;
+
+        return switch (code) {
+            case "FD6" -> RESTAURANT;
+            case "CE7" -> CAFE;
+            case "CT1" -> PERFORMANCE;
+            default -> ETC;
+        };
+    }
 }

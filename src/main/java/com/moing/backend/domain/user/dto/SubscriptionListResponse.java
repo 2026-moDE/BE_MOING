@@ -12,7 +12,9 @@ public record SubscriptionListResponse(
     public record PlaceInfo(
             Long id,
             String name,
-            String address
+            String address,
+            @JsonProperty("thumbnail_url") String thumbnailUrl,
+            @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl
     ) {}
 
     public record SubscriptionItem(

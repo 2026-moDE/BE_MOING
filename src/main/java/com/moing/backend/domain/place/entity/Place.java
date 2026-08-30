@@ -11,6 +11,12 @@ import java.time.LocalDateTime;
 /**
  * 장소 엔티티
  * 카페, 팝업 등 다양한 카테고리의 장소 정보를 관리한다.
+ *
+ * 활성 장소의 name은 유일해야 한다. 비활성 장소는 같은 이름이 남아 있을 수 있으므로
+ * 전체 unique 제약 대신 부분 unique 인덱스로 강제한다 (JPA로는 표현 불가).
+ *   CREATE UNIQUE INDEX uk_places_name_active ON places (name) WHERE is_active = true;
+ * 이 인덱스가 없으면 동시 검색 요청이 같은 장소를 중복 삽입하고,
+ * 이후 이름 조회가 전부 실패한다.
  */
 @Entity
 @Table(name = "places")
@@ -54,4 +60,12 @@ public class Place {
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public void updateIsActive(boolean isActive) {
+        this.isActive = isActive;
+    }
+
+    public void updateCategory(PlaceCategory category) {
+        this.category = category;
+    }
 }

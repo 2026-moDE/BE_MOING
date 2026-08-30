@@ -1,6 +1,7 @@
 package com.moing.backend.domain.review.repository;
 
 import com.moing.backend.domain.review.entity.Review;
+import com.moing.backend.domain.review.entity.Visibility;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -202,6 +203,35 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("year") Integer year,
             @Param("month") Integer month,
             Pageable pageable);
+
+    // 타인 프로필/리뷰 목록: 조회자에게 보이는 리뷰만 커서 기반으로 조회한다.
+    // visibility가 null인 옛 리뷰는 전체 공개로 취급한다(엔티티가 기본값을 넣기 전에 쌓인 것들).
+    // 친구가 아니면 visibilities에 PUBLIC만 넘겨 친구 공개 리뷰를 걸러낸다.
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.userId = :userId
+              AND r.isBlinded = false
+              AND (:cursor IS NULL OR r.id < :cursor)
+              AND (r.visibility IS NULL OR r.visibility IN :visibilities)
+            ORDER BY r.id DESC
+            """)
+    List<Review> findUserVisibleReviews(
+            @Param("userId") Long userId,
+            @Param("visibilities") List<Visibility> visibilities,
+            @Param("cursor") Long cursor,
+            Pageable pageable);
+
+    // 타인 프로필의 review_count. 조건을 findUserVisibleReviews와 맞춰야
+    // 목록에 뜨는 개수와 어긋나지 않는다
+    @Query("""
+            SELECT COUNT(r) FROM Review r
+            WHERE r.userId = :userId
+              AND r.isBlinded = false
+              AND (r.visibility IS NULL OR r.visibility IN :visibilities)
+            """)
+    long countUserVisibleReviews(
+            @Param("userId") Long userId,
+            @Param("visibilities") List<Visibility> visibilities);
 
     // 오늘 리뷰 수 (관리자 통계)
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);

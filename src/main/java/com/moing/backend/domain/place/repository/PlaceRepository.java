@@ -140,6 +140,37 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             @Param("radius") int radius,
             @Param("since") LocalDateTime since);
 
+    /**
+     * 인기 장소: 최근 리뷰가 minReviews개 이상인 활성 장소 (거리 오름차순)
+     *
+     * 리뷰 조건은 ReviewRepository.findVisibleRecentReviewsByPlaceIds와 반드시 같아야 한다.
+     * 어긋나면 노출 기준 개수와 응답의 review_count가 서로 달라진다.
+     */
+    @Query(value = """
+            SELECT * FROM places p
+            WHERE p.is_active = true
+              AND (
+                SELECT COUNT(*) FROM reviews r
+                WHERE r.place_id = p.id
+                  AND r.created_at > :since
+                  AND r.is_blinded = false
+                  AND (r.visibility IS NULL OR r.visibility <> 'FRIENDS')
+              ) >= :minReviews
+            ORDER BY (6371000 * acos(
+                    GREATEST(-1.0, LEAST(1.0,
+                      cos(radians(:lat)) * cos(radians(p.latitude))
+                      * cos(radians(p.longitude) - radians(:lng))
+                      + sin(radians(:lat)) * sin(radians(p.latitude))
+                    ))
+                  )) ASC
+            """, nativeQuery = true)
+    List<Place> findHotPlaces(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            @Param("since") LocalDateTime since,
+            @Param("minReviews") int minReviews,
+            Pageable pageable);
+
     /** keyword가 name 또는 address에 포함된 활성 장소를 조회한다 */
     @Query("SELECT p FROM Place p WHERE p.isActive = true AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(p.address) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<Place> searchByNameOrAddress(@Param("keyword") String keyword);

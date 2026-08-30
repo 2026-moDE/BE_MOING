@@ -11,6 +11,8 @@ public record CommentListResponse(
         @JsonProperty("next_cursor") Long nextCursor
 ) {
     public record UserInfo(
+            // 프로필 조회(GET /api/users/{userId}) 호출에 필요하다. 삭제된 댓글은 작성자를 감추므로 null
+            @JsonProperty("user_id") Long userId,
             String nickname,
             @JsonProperty("profile_image_url") String profileImageUrl,
             @JsonProperty("profile_url") String profileUrl

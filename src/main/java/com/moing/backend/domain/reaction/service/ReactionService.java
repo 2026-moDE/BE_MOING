@@ -127,17 +127,19 @@ public class ReactionService {
                 .map(r -> new ReactionListResponse.ReactionItem(
                         r.getEmoji(),
                         userId.equals(r.getUserId()),
-                        toUserInfo(userMap.get(r.getUserId()))))
+                        toUserInfo(r.getUserId(), userMap)))
                 .toList();
 
         return new ReactionListResponse(items);
     }
 
-    // 탈퇴한 유저의 반응도 남아 있으므로 작성자를 찾지 못하는 경우를 대비한다
-    private ReactionListResponse.UserInfo toUserInfo(User user) {
+    // 탈퇴한 유저의 반응도 남아 있으므로 작성자를 찾지 못하는 경우를 대비한다.
+    // 유저를 못 찾아도 user_id는 반응에 남아 있으므로 그대로 내려준다 (리뷰·댓글 목록과 동일)
+    private ReactionListResponse.UserInfo toUserInfo(Long userId, Map<Long, User> userMap) {
+        User user = userMap.get(userId);
         return user != null
-                ? new ReactionListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
-                : new ReactionListResponse.UserInfo("알 수 없음", null, null);
+                ? new ReactionListResponse.UserInfo(userId, user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
+                : new ReactionListResponse.UserInfo(userId, "알 수 없음", null, null);
     }
 
     // 친구 공개 리뷰는 리뷰 작성자 본인과 친구만 접근할 수 있다

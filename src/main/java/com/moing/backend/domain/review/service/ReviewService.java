@@ -269,8 +269,8 @@ public class ReviewService {
                 .map(r -> {
                     User user = userMap.get(r.getUserId());
                     ReviewListResponse.UserInfo userInfo = user != null
-                            ? new ReviewListResponse.UserInfo(user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
-                            : new ReviewListResponse.UserInfo("알 수 없음", null, null);
+                            ? new ReviewListResponse.UserInfo(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getProfileUrl())
+                            : new ReviewListResponse.UserInfo(r.getUserId(), "알 수 없음", null, null);
                     boolean isMine = userId != null && userId.equals(r.getUserId());
                     // 상세 조회와 동일하게 내 리뷰면 is_friend는 false
                     boolean isFriend = !isMine && friendIds.contains(r.getUserId());

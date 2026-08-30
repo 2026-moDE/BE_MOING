@@ -20,6 +20,10 @@ public class Comment {
     // 답글이 달린 댓글을 삭제할 때 내용 대신 노출하는 문구
     public static final String DELETED_CONTENT = "삭제된 댓글입니다.";
 
+    // 삭제된 댓글의 작성자 자리에 노출하는 문구.
+    // 닉네임은 형식 제약이 없어 실존 유저가 선점할 수 있으므로 괄호를 붙여 구분한다.
+    public static final String DELETED_NICKNAME = "(삭제됨)";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

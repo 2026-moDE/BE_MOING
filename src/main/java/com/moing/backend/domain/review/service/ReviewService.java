@@ -1,7 +1,10 @@
 package com.moing.backend.domain.review.service;
 
+import com.moing.backend.domain.comment.repository.CommentModerationRepository;
+import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
+import com.moing.backend.domain.reaction.repository.ReactionRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
 import com.moing.backend.domain.notification.service.NotificationService;
 import com.moing.backend.domain.place.entity.Place;
@@ -47,6 +50,9 @@ public class ReviewService {
     private final NotificationService notificationService;
     private final CongestionCacheService congestionCacheService;
     private final FollowRepository followRepository;
+    private final CommentRepository commentRepository;
+    private final CommentModerationRepository commentModerationRepository;
+    private final ReactionRepository reactionRepository;
 
     // 리뷰 상세 조회
     @Transactional(readOnly = true)
@@ -109,6 +115,18 @@ public class ReviewService {
         }
 
         Long placeId = review.getPlaceId();
+
+        // DB에 FK가 없어 cascade가 걸리지 않는다. 남겨두면 어느 화면에도 안 나오는 고아 행이 되므로
+        // 자식부터 직접 지운다. 같은 트랜잭션이라 중간에 실패하면 전부 롤백된다.
+        reactionRepository.deleteAllByReviewId(reviewId);
+
+        // 답글도 review_id를 갖고 있어 최상위 댓글과 함께 지워진다
+        List<Long> commentIds = commentRepository.findIdsByReviewId(reviewId);
+        if (!commentIds.isEmpty()) {
+            commentModerationRepository.deleteAllByCommentIdIn(commentIds);
+            commentRepository.deleteAllByReviewId(reviewId);
+        }
+
         reviewRepository.delete(review);
 
         // 지운 리뷰가 혼잡도에 남지 않도록 즉시 갱신한다.

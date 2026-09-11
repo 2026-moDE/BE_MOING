@@ -3,6 +3,7 @@ package com.moing.backend.domain.comment.repository;
 import com.moing.backend.domain.comment.entity.Comment;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,6 +34,17 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     // 답글 존재 여부 (삭제 방식 결정용, 소프트 삭제된 답글도 부모를 붙들고 있으므로 포함한다)
     boolean existsByParentId(Long parentId);
+
+    // 리뷰에 달린 댓글 id 전체 (답글 포함). 검열 결과를 함께 지우기 위해 필요하다
+    @Query("SELECT c.id FROM Comment c WHERE c.reviewId = :reviewId")
+    List<Long> findIdsByReviewId(@Param("reviewId") Long reviewId);
+
+    // 리뷰 삭제 시 딸린 댓글 정리.
+    // 답글도 review_id를 갖고 있으므로 최상위 댓글과 답글이 한 번에 지워진다.
+    // 리뷰 자체가 사라지는 상황이라 소프트 삭제(자리표시)는 의미가 없어 실제로 지운다.
+    @Modifying
+    @Query("DELETE FROM Comment c WHERE c.reviewId = :reviewId")
+    int deleteAllByReviewId(@Param("reviewId") Long reviewId);
 
     // 아직 AI 검열을 거치지 않은 댓글 (오래된 것부터). 삭제된 댓글은 검사하지 않는다
     @Query(value = """

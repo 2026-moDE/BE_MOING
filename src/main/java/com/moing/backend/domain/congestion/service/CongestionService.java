@@ -31,23 +31,25 @@ public class CongestionService {
     private final ReviewRepository reviewRepository;
     private final SeoulPublicDataService seoulPublicDataService;
 
-    // 서울 주요 지역 목록 (지역명은 서울 실시간 도시 데이터 API 명칭 사용)
+    // 서울 주요 지역 목록
+    // 지역명은 공공 API 조회 키라서 서울시 공식 장소명과 한 글자라도 다르면 데이터가 안 내려온다.
+    // 이름·좌표 모두 서울시 실시간 도시데이터 장소 목록 기준으로 맞춰둔다.
     private static final List<SeoulArea> SEOUL_AREAS = List.of(
-            new SeoulArea("강남 MICE 관광특구", 37.5172, 127.0473),
-            new SeoulArea("홍대입구역", 37.5575, 126.9244),
-            new SeoulArea("성수동", 37.5446, 127.0564),
-            new SeoulArea("명동", 37.5636, 126.9847),
-            new SeoulArea("이태원·한남동", 37.5347, 126.9943),
-            new SeoulArea("잠실 MICE 관광특구", 37.5133, 127.1000),
-            new SeoulArea("신촌·이대", 37.5555, 126.9369),
-            new SeoulArea("인사동·익선동", 37.5745, 126.9856),
-            new SeoulArea("동대문 관광특구", 37.5714, 127.0097),
-            new SeoulArea("압구정로데오거리", 37.5273, 127.0287),
-            new SeoulArea("북촌한옥마을", 37.5816, 126.9835),
-            new SeoulArea("광화문·덕수궁", 37.5703, 126.9768),
-            new SeoulArea("서울역", 37.5546, 126.9707),
-            new SeoulArea("고속터미널", 37.5051, 127.0047),
-            new SeoulArea("건대입구역", 37.5403, 127.0697)
+            new SeoulArea("강남 MICE 관광특구", 37.51100, 127.06006),
+            new SeoulArea("홍대입구역(2호선)", 37.55676, 126.92301),
+            new SeoulArea("성수카페거리", 37.54297, 127.05660),
+            new SeoulArea("명동 관광특구", 37.56415, 126.98185),
+            new SeoulArea("이태원 관광특구", 37.53444, 126.99437),
+            new SeoulArea("잠실 관광특구", 37.51648, 127.11527),
+            new SeoulArea("신촌·이대역", 37.55704, 126.93897),
+            new SeoulArea("인사동", 37.57386, 126.98606),
+            new SeoulArea("동대문 관광특구", 37.56731, 127.01102),
+            new SeoulArea("압구정로데오거리", 37.52550, 127.03873),
+            new SeoulArea("북촌한옥마을", 37.58224, 126.98400),
+            new SeoulArea("광화문·덕수궁", 37.57093, 126.97719),
+            new SeoulArea("서울역", 37.55659, 126.97303),
+            new SeoulArea("고속터미널역", 37.50481, 127.00586),
+            new SeoulArea("건대입구역", 37.53997, 127.06820)
     );
 
     /**
@@ -77,8 +79,8 @@ public class CongestionService {
 
             if (reviewCount >= USER_REVIEW_THRESHOLD) {
                 List<Review> reviews = reviewRepository.findByPlaceIdsAndCreatedAtAfter(placeIds, since);
-                String congestionLevel = aggregateCongestion(reviews);
-                return new CongestionResponse.AreaItem(area.name(), congestionLevel, null, "USER");
+                CongestionLevel congestionLevel = aggregateCongestion(reviews);
+                return CongestionResponse.AreaItem.of(area.name(), congestionLevel, null, "USER");
             }
         }
 
@@ -86,36 +88,33 @@ public class CongestionService {
         SeoulCityDataResponse.Row row = seoulPublicDataService.fetchPopulation(area.name());
         if (row == null) return null;
 
-        String congestionLevel = mapPublicCongestion(row.areaCongestLvl());
+        CongestionLevel congestionLevel = mapPublicCongestion(row.areaCongestLvl());
         int population = average(row.areaPpltnMin(), row.areaPpltnMax());
-        return new CongestionResponse.AreaItem(area.name(), congestionLevel, population, "PUBLIC");
+        return CongestionResponse.AreaItem.of(area.name(), congestionLevel, population, "PUBLIC");
     }
 
-    // 리뷰 CongestionLevel 다수결로 대표값 결정 후 문자열 매핑
-    private String aggregateCongestion(List<Review> reviews) {
+    // 리뷰 CongestionLevel 다수결로 대표값 결정
+    private CongestionLevel aggregateCongestion(List<Review> reviews) {
         Map<CongestionLevel, Long> counts = reviews.stream()
                 .filter(r -> r.getCongestionLevel() != null)
                 .collect(Collectors.groupingBy(Review::getCongestionLevel, Collectors.counting()));
 
-        CongestionLevel dominant = counts.entrySet().stream()
+        return counts.entrySet().stream()
                 .max(Comparator.comparingLong(Map.Entry::getValue))
                 .map(Map.Entry::getKey)
-                .orElse(CongestionLevel.LOW);
-
-        return switch (dominant) {
-            case HIGH -> "CROWDED";
-            case MEDIUM -> "MODERATE";
-            case LOW -> "LOW";
-        };
+                .orElse(CongestionLevel.RELAXED);
     }
 
-    // 서울시 공공 API 혼잡도 문자열 → 응답값 매핑
-    private String mapPublicCongestion(String lvl) {
-        if (lvl == null) return "LOW";
+    // 서울시 공공 API 혼잡도 4단계 → CongestionLevel 1:1 매핑
+    // (case 값은 서울시가 내려주는 원본 문자열이라 표시 라벨과 별개로 유지한다)
+    private CongestionLevel mapPublicCongestion(String lvl) {
+        if (lvl == null) return CongestionLevel.RELAXED;
         return switch (lvl) {
-            case "붐빔" -> "CROWDED";
-            case "보통" -> "MODERATE";
-            default -> "LOW"; // 여유, 한산
+            case "여유" -> CongestionLevel.RELAXED;
+            case "보통" -> CongestionLevel.MODERATE;
+            case "약간 붐빔" -> CongestionLevel.CROWDED;
+            case "붐빔" -> CongestionLevel.VERY_CROWDED;
+            default -> CongestionLevel.RELAXED;
         };
     }
 

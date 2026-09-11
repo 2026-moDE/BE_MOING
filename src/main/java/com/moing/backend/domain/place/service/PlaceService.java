@@ -27,11 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.data.domain.PageRequest;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -76,6 +76,8 @@ public class PlaceService {
      * @param query     네이버 검색어 (예: "카페", "맛집")
      */
     // 주변 장소 조회 (카카오 검색 -> DB 매칭)
+    // 카카오에만 있는 장소를 적재하므로 읽기 전용이 아니다
+    @Transactional
     public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query, String filter) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
@@ -136,21 +138,29 @@ public class PlaceService {
     private PlaceNearbyResponse.PlaceItem buildPlaceItemFromKakao(
             KakaoLocalResponse.Document doc, String filter, LocalDateTime since) {
 
-        double docLat = Double.parseDouble(doc.y());
-        double docLng = Double.parseDouble(doc.x());
-        String name = doc.placeName();
+        Place place = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(doc.placeName())
+                .orElseGet(() -> saveFromKakao(doc));
 
-        Optional<Place> dbPlace = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
+        PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
+        return toItem(place, filter, since, cache);
+    }
 
-        if (dbPlace.isPresent()) {
-            Place place = dbPlace.get();
-            PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
-            return toItem(place, filter, since, cache);
-        }
-
-        String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
-        PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
-        return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, null, category, address);
+    /**
+     * 카카오에만 있는 장소를 이 시점에 적재한다.
+     *
+     * <p>id 없이 내려보내면 클라이언트가 목록에서 장소를 골라도 리뷰를 쓸 수 없다.
+     * 좌표 기반 조회는 DB에 적재된 장소만 보므로, 여기서 넣어둬야 키워드 검색으로
+     * 찾은 장소가 이후 주변 검색에도 나타난다.
+     */
+    private Place saveFromKakao(KakaoLocalResponse.Document doc) {
+        return placeRepository.save(Place.builder()
+                .name(doc.placeName())
+                .address(doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName())
+                .latitude(new BigDecimal(doc.y()))
+                .longitude(new BigDecimal(doc.x()))
+                .category(PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode()))
+                .source("KAKAO")
+                .build());
     }
 
     // placeId 목록으로 혼잡도 캐시를 한 번에 로드
@@ -200,6 +210,7 @@ public class PlaceService {
      *   <li>keyword 없음 + 좌표 없음 → 빈 배열</li>
      * </ul>
      */
+    @Transactional
     public PlaceNearbyResponse searchPlaces(String keyword, Double latitude, Double longitude) {
         if (keyword == null || keyword.isBlank()) {
             // 좌표가 없으면 기준점이 없으므로 아무것도 내려주지 않는다
@@ -225,23 +236,7 @@ public class PlaceService {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceNearbyResponse.PlaceItem> items = kakaoResult.documents().stream()
-                .map(doc -> {
-                    double docLng = Double.parseDouble(doc.x());
-                    double docLat = Double.parseDouble(doc.y());
-                    String name = doc.placeName();
-
-                    Optional<Place> dbPlace = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
-
-                    if (dbPlace.isPresent()) {
-                        Place place = dbPlace.get();
-                        PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
-                        return toItem(place, "all", since, cache);
-                    }
-
-                    String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
-                    PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
-                    return new PlaceNearbyResponse.PlaceItem(null, name, docLat, docLng, null, null, null, category, address);
-                })
+                .map(doc -> buildPlaceItemFromKakao(doc, "all", since))
                 .toList();
 
         return new PlaceNearbyResponse(items);

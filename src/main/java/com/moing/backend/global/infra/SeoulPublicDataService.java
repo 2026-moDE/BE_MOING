@@ -41,12 +41,10 @@ public class SeoulPublicDataService {
 
         try {
             SeoulCityDataResponse response = restTemplate.getForObject(uri, SeoulCityDataResponse.class);
-            if (response == null || response.cityDataPpltn() == null
-                    || response.cityDataPpltn().row() == null
-                    || response.cityDataPpltn().row().isEmpty()) {
+            if (response == null || response.rows() == null || response.rows().isEmpty()) {
                 return null;
             }
-            return response.cityDataPpltn().row().get(0);
+            return response.rows().get(0);
         } catch (RestClientException e) {
             log.warn("서울시 실시간 인구 API 호출 실패 [{}]: {}", areaName, e.getMessage());
             return null;

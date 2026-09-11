@@ -1,0 +1,31 @@
+{
+  "SeoulRtd.citydata_ppltn": [
+    {
+      "AREA_NM": "광화문·덕수궁",
+      "AREA_CD": "POI009",
+      "AREA_CONGEST_LVL": "여유",
+      "AREA_CONGEST_MSG": "사람이 몰려있을 가능성이 낮고 붐빔은 거의 느껴지지 않아요. 도보 이동이 자유로워요.",
+      "AREA_PPLTN_MIN": "18000",
+      "AREA_PPLTN_MAX": "20000",
+      "MALE_PPLTN_RATE": "52.8",
+      "FEMALE_PPLTN_RATE": "47.2",
+      "PPLTN_RATE_0": "0.7",
+      "PPLTN_RATE_10": "3.2",
+      "PPLTN_RATE_20": "21.1",
+      "PPLTN_RATE_30": "23.0",
+      "PPLTN_RATE_40": "22.3",
+      "PPLTN_RATE_50": "18.3",
+      "PPLTN_RATE_60": "7.9",
+      "PPLTN_RATE_70": "3.4",
+      "RESNT_PPLTN_RATE": "21.4",
+      "NON_RESNT_PPLTN_RATE": "78.6",
+      "REPLACE_YN": "N",
+      "PPLTN_TIME": "2026-09-07 20:35",
+      "FCST_YN": "Y"
+    }
+  ],
+  "RESULT": {
+    "RESULT.CODE": "INFO-000",
+    "RESULT.MESSAGE": "정상 처리되었습니다."
+  }
+}

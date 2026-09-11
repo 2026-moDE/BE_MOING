@@ -29,7 +29,7 @@ public class Review {
     private Long placeId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "congestion_level", length = 10)
+    @Column(name = "congestion_level", length = 20)
     private CongestionLevel congestionLevel;
 
     @Column(name = "quick_tag", length = 50)

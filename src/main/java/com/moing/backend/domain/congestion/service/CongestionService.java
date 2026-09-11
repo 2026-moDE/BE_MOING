@@ -79,8 +79,8 @@ public class CongestionService {
 
             if (reviewCount >= USER_REVIEW_THRESHOLD) {
                 List<Review> reviews = reviewRepository.findByPlaceIdsAndCreatedAtAfter(placeIds, since);
-                String congestionLevel = aggregateCongestion(reviews);
-                return new CongestionResponse.AreaItem(area.name(), congestionLevel, null, "USER");
+                CongestionLevel congestionLevel = aggregateCongestion(reviews);
+                return CongestionResponse.AreaItem.of(area.name(), congestionLevel, null, "USER");
             }
         }
 
@@ -88,36 +88,33 @@ public class CongestionService {
         SeoulCityDataResponse.Row row = seoulPublicDataService.fetchPopulation(area.name());
         if (row == null) return null;
 
-        String congestionLevel = mapPublicCongestion(row.areaCongestLvl());
+        CongestionLevel congestionLevel = mapPublicCongestion(row.areaCongestLvl());
         int population = average(row.areaPpltnMin(), row.areaPpltnMax());
-        return new CongestionResponse.AreaItem(area.name(), congestionLevel, population, "PUBLIC");
+        return CongestionResponse.AreaItem.of(area.name(), congestionLevel, population, "PUBLIC");
     }
 
-    // 리뷰 CongestionLevel 다수결로 대표값 결정 후 문자열 매핑
-    private String aggregateCongestion(List<Review> reviews) {
+    // 리뷰 CongestionLevel 다수결로 대표값 결정
+    private CongestionLevel aggregateCongestion(List<Review> reviews) {
         Map<CongestionLevel, Long> counts = reviews.stream()
                 .filter(r -> r.getCongestionLevel() != null)
                 .collect(Collectors.groupingBy(Review::getCongestionLevel, Collectors.counting()));
 
-        CongestionLevel dominant = counts.entrySet().stream()
+        return counts.entrySet().stream()
                 .max(Comparator.comparingLong(Map.Entry::getValue))
                 .map(Map.Entry::getKey)
-                .orElse(CongestionLevel.LOW);
-
-        return switch (dominant) {
-            case HIGH -> "CROWDED";
-            case MEDIUM -> "MODERATE";
-            case LOW -> "LOW";
-        };
+                .orElse(CongestionLevel.RELAXED);
     }
 
-    // 서울시 공공 API 혼잡도 문자열 → 응답값 매핑
-    private String mapPublicCongestion(String lvl) {
-        if (lvl == null) return "LOW";
+    // 서울시 공공 API 혼잡도 4단계 → CongestionLevel 1:1 매핑
+    // (case 값은 서울시가 내려주는 원본 문자열이라 표시 라벨과 별개로 유지한다)
+    private CongestionLevel mapPublicCongestion(String lvl) {
+        if (lvl == null) return CongestionLevel.RELAXED;
         return switch (lvl) {
-            case "붐빔" -> "CROWDED";
-            case "보통" -> "MODERATE";
-            default -> "LOW"; // 여유, 한산
+            case "여유" -> CongestionLevel.RELAXED;
+            case "보통" -> CongestionLevel.MODERATE;
+            case "약간 붐빔" -> CongestionLevel.CROWDED;
+            case "붐빔" -> CongestionLevel.VERY_CROWDED;
+            default -> CongestionLevel.RELAXED;
         };
     }
 

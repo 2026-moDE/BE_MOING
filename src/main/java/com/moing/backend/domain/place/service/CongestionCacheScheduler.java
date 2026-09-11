@@ -22,9 +22,10 @@ import java.util.stream.Collectors;
  *
  * <p>계산 방식: 최근 3시간 ACTIVE 리뷰(최대 50건)에 시간 가중치(w = 1 / (경과분 + 1))를 적용한 가중 평균
  * <ul>
- *   <li>LOW(여유)  : 1.0 ~ 1.6</li>
- *   <li>MEDIUM(보통): 1.7 ~ 2.3</li>
- *   <li>HIGH(혼잡) : 2.4 ~ 3.0</li>
+ *   <li>RELAXED(한산해요)      : 1.00 ~ 1.75</li>
+ *   <li>MODERATE(적당해요)     : 1.75 ~ 2.50</li>
+ *   <li>CROWDED(붐벼요)        : 2.50 ~ 3.25</li>
+ *   <li>VERY_CROWDED(매우 붐벼요): 3.25 ~ 4.00</li>
  * </ul>
  */
 @Slf4j

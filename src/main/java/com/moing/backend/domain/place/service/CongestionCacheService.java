@@ -59,15 +59,18 @@ public class CongestionCacheService {
 
     int toScore(CongestionLevel level) {
         return switch (level) {
-            case LOW -> 1;
-            case MEDIUM -> 2;
-            case HIGH -> 3;
+            case RELAXED -> 1;
+            case MODERATE -> 2;
+            case CROWDED -> 3;
+            case VERY_CROWDED -> 4;
         };
     }
 
+    // 가중 평균 점수(1~4)를 4등분한 임계값으로 등급 분류
     CongestionLevel toCongestionLevel(double index) {
-        if (index <= 1.6) return CongestionLevel.LOW;
-        if (index <= 2.3) return CongestionLevel.MEDIUM;
-        return CongestionLevel.HIGH;
+        if (index <= 1.75) return CongestionLevel.RELAXED;
+        if (index <= 2.5) return CongestionLevel.MODERATE;
+        if (index <= 3.25) return CongestionLevel.CROWDED;
+        return CongestionLevel.VERY_CROWDED;
     }
 }

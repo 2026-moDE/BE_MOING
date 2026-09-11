@@ -21,7 +21,7 @@ public class PlaceCongestionCache {
     private Long placeId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "congestion_level", length = 10)
+    @Column(name = "congestion_level", length = 20)
     private CongestionLevel congestionLevel;
 
     @Column(name = "congestion_index")

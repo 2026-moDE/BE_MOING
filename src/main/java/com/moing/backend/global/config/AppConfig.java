@@ -15,10 +15,19 @@ import java.time.Duration;
 @Configuration
 public class AppConfig {
 
-    // 외부 API 호출용 RestTemplate 빈 등록
+    /**
+     * 외부 API 호출용 RestTemplate.
+     *
+     * <p>카카오 로그인·JWKS·카카오 장소검색·서울시 공공데이터가 함께 쓴다.
+     * 모두 요청 스레드에서 도는 짧은 JSON 호출이라, 타임아웃이 없으면
+     * 상대 서버가 응답을 안 줄 때 사용자 요청이 그대로 묶인다.
+     */
     @Bean
     public RestTemplate restTemplate() {
-        return new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(3));
+        factory.setReadTimeout(Duration.ofSeconds(5));
+        return new RestTemplate(factory);
     }
 
     /**

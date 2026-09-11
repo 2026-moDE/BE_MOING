@@ -22,6 +22,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -79,23 +80,32 @@ public class SearchService {
 
     /**
      * 검색 자동완성
-     * 네이버 검색 결과에서 키워드로 시작하는 장소명 상위 10개를 반환한다.
+     * 카카오 검색 결과 상위 10개를 반환한다.
+     *
+     * <p>좌표를 주면 거리순으로 정렬된다. 좌표가 없으면 카카오 기본값인
+     * 전국 정확도순이라, "바나"에 용인 유치원·여수 레미콘 같은
+     * 무관한 장소가 올라오고 정작 근처 지점은 잘린다.
      */
-    public AutocompleteResponse autocomplete(String keyword) {
-        KakaoLocalResponse kakaoResult = kakaoSearchService.search(keyword, null, null, null);
+    public AutocompleteResponse autocomplete(String keyword, Double latitude, Double longitude) {
+        KakaoLocalResponse kakaoResult = kakaoSearchService.search(keyword, longitude, latitude, null);
 
         if (kakaoResult == null || kakaoResult.documents() == null) {
             return new AutocompleteResponse(List.of());
         }
 
         List<AutocompleteResponse.Suggestion> suggestions = kakaoResult.documents().stream()
-                .limit(10)
                 .map(doc -> {
                     String name = doc.placeName();
                     String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
                     String category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode()).name();
                     return new AutocompleteResponse.Suggestion(null, name, address, category);
                 })
+                // 카카오가 준 순서(좌표가 있으면 거리순)를 유지하되 ETC만 뒤로 민다.
+                // 유치원·레미콘·인테리어처럼 찾을 일 없는 장소가 대부분 ETC로 들어오는데,
+                // 거리순만으로는 가까운 ETC가 정작 찾는 가게를 밀어낸다.
+                // 자르기 전에 정렬해야 뒤쪽에 있던 카페·음식점이 10개 안으로 올라온다.
+                .sorted(Comparator.comparing(s -> PlaceCategory.ETC.name().equals(s.category())))
+                .limit(10)
                 .toList();
 
         return new AutocompleteResponse(suggestions);

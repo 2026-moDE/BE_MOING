@@ -76,14 +76,18 @@ public class SearchController {
     }
 
     // 검색 자동완성
+    // 좌표를 주면 거리순으로 정렬한다 (없으면 카카오 기본값인 전국 정확도순)
     @GetMapping("/autocomplete")
     public ResponseEntity<ApiResponse<AutocompleteResponse>> autocomplete(
             @AuthenticationPrincipal Long userId,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude
     ) {
         if (!StringUtils.hasText(keyword)) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
-        return ResponseEntity.ok(ApiResponse.success("success", searchService.autocomplete(keyword)));
+        return ResponseEntity.ok(ApiResponse.success("success",
+                searchService.autocomplete(keyword, latitude, longitude)));
     }
 }

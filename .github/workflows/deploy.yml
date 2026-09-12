@@ -16,8 +16,17 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          # 한 줄이라도 실패하면 배포를 멈춘다.
+          # 기본값(false)이면 git 단계가 실패해도 옛 코드로 빌드·재시작해
+          # Actions는 초록불인데 서버만 옛 버전으로 남는다
+          script_stop: true
           script: |
+            set -e
             cd /home/ubuntu/BE_MOING
-            git pull origin develop
+            # pull(merge) 대신 원격을 그대로 따라간다.
+            # 서버는 커밋을 만들지 않으므로 머지할 이유가 없고,
+            # 히스토리가 재작성돼도 divergent 오류 없이 따라붙는다
+            git fetch origin develop
+            git reset --hard origin/develop
             ./gradlew clean build -x test
             sudo systemctl restart moing

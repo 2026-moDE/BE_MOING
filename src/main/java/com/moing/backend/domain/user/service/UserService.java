@@ -148,6 +148,12 @@ public class UserService {
         return isFriend || viewerId.equals(targetUserId);
     }
 
+    // 엔티티가 기본값을 넣기 전에 쌓인 리뷰는 visibility가 비어 있다.
+    // 조회 쿼리가 전체 공개로 취급하므로 응답에서도 같은 값으로 맞춘다
+    private Visibility visibilityOf(Review review) {
+        return review.getVisibility() != null ? review.getVisibility() : Visibility.PUBLIC;
+    }
+
     // visibility가 null인 옛 리뷰는 쿼리에서 전체 공개로 취급하므로 여기 넣지 않는다
     private List<Visibility> visibleTo(boolean fullAccess) {
         return fullAccess
@@ -180,7 +186,7 @@ public class UserService {
 
             return new UserReviewItem(
                     r.getId(), placeInfo, r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
-                    r.getCongestionLevel(), r.getComment(), createdAt, isRecent);
+                    r.getCongestionLevel(), r.getComment(), visibilityOf(r), createdAt, isRecent);
         }).toList();
     }
 
@@ -205,7 +211,7 @@ public class UserService {
                     : new MyReviewListResponse.PlaceInfo(r.getPlaceId(), null, null);
             return new MyReviewListResponse.MyReviewItem(
                     r.getId(), placeInfo, r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
-                    r.getCongestionLevel(), r.getComment(), r.getCreatedAt());
+                    r.getCongestionLevel(), r.getComment(), visibilityOf(r), r.getCreatedAt());
         }).toList();
 
         return new MyReviewListResponse(items, nextCursor);

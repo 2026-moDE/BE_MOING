@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.moing.backend.domain.review.entity.CongestionLevel;
+import com.moing.backend.domain.review.entity.Visibility;
 
 import java.time.LocalDateTime;
 
@@ -20,7 +21,7 @@ import java.time.LocalDateTime;
  * </ul>
  */
 @JsonPropertyOrder({"id", "place", "image_url", "thumbnail_url", "thumbnail_small_url",
-        "congestion_level", "comment", "created_at", "is_recent"})
+        "congestion_level", "comment", "visibility", "created_at", "is_recent"})
 public record UserReviewItem(
         Long id,
         PlaceInfo place,
@@ -29,6 +30,8 @@ public record UserReviewItem(
         @JsonProperty("thumbnail_small_url") String thumbnailSmallUrl,
         @JsonProperty("congestion_level") CongestionLevel congestionLevel,
         String comment,
+        // 친구가 아닌 조회자에게는 애초에 전체 공개 리뷰만 내려가므로 항상 PUBLIC이다
+        Visibility visibility,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
         @JsonProperty("created_at") LocalDateTime createdAt,
         @JsonInclude(JsonInclude.Include.NON_NULL)

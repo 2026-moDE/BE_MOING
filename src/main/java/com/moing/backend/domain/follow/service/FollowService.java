@@ -12,6 +12,7 @@ import com.moing.backend.domain.notification.service.NotificationService;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.review.entity.Review;
+import com.moing.backend.domain.review.entity.Visibility;
 import com.moing.backend.domain.review.repository.ReviewRepository;
 import com.moing.backend.domain.user.entity.User;
 import com.moing.backend.domain.user.repository.UserRepository;
@@ -278,6 +279,7 @@ public class FollowService {
                             // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 이 값이 null이라
                             // 사진이 있는데도 동그라미가 비므로 큰 썸네일 -> 원본 순으로 폴백한다
                             firstNonNull(r.getThumbnailSmallUrl(), r.getThumbnailUrl(), r.getImageUrl()),
+                            r.getVisibility() != null ? r.getVisibility() : Visibility.PUBLIC,
                             new FriendFeedResponse.UserInfo(
                                     author.getId(), author.getNickname(), author.getProfileUrl()),
                             r.getCreatedAt()

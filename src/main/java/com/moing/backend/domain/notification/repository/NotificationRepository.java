@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
@@ -21,12 +22,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("cursor") Long cursor,
             Pageable pageable);
 
-    // 미읽음 알림 존재 여부. 파생 쿼리 이름(...IsReadFalse)은 boolean 필드 isRead를
-    // read로 볼지 isRead로 볼지 모호해서 JPQL로 명시한다
+    /**
+     * 알림함 마지막 방문 이후 도착한 알림이 있는지. 알림 아이콘의 점을 켜는 기준이다.
+     *
+     * <p>개별 읽음(is_read)이 아니라 방문 시각으로 판단한다. 알림함에 들어가면 점이 꺼지고,
+     * 그 뒤 새 알림이 오면 다시 켜지는 동작이라 읽음 여부와는 무관하다.
+     *
+     * <p>한 번도 방문하지 않은 유저(checkedAt = null)는 알림이 하나라도 있으면 켠다.
+     */
     @Query("""
             SELECT COUNT(n) > 0 FROM Notification n
             WHERE n.userId = :userId
-              AND n.isRead = false
+              AND (:checkedAt IS NULL OR n.createdAt > :checkedAt)
             """)
-    boolean existsUnread(@Param("userId") Long userId);
+    boolean existsArrivedAfter(@Param("userId") Long userId,
+                               @Param("checkedAt") LocalDateTime checkedAt);
 }

@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
  * </ul>
  */
 @JsonPropertyOrder({"id", "place", "image_url", "thumbnail_url", "thumbnail_small_url",
-        "congestion_level", "comment", "visibility", "created_at", "is_recent"})
+        "congestion_level", "comment", "visibility", "comment_count", "created_at", "is_recent"})
 public record UserReviewItem(
         Long id,
         PlaceInfo place,
@@ -32,6 +32,8 @@ public record UserReviewItem(
         String comment,
         // 친구가 아닌 조회자에게는 애초에 전체 공개 리뷰만 내려가므로 항상 PUBLIC이다
         Visibility visibility,
+        // 답글과 삭제된(자리표시) 댓글까지 포함한 수. 댓글 목록에 보이는 개수와 같다
+        @JsonProperty("comment_count") long commentCount,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
         @JsonProperty("created_at") LocalDateTime createdAt,
         @JsonInclude(JsonInclude.Include.NON_NULL)

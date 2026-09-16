@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
@@ -34,6 +36,29 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     // 답글 존재 여부 (삭제 방식 결정용, 소프트 삭제된 답글도 부모를 붙들고 있으므로 포함한다)
     boolean existsByParentId(Long parentId);
+
+    // 리뷰 한 건의 댓글 수 (답글과 자리표시로 남은 삭제 댓글 포함)
+    long countByReviewId(Long reviewId);
+
+    // 리뷰별 댓글 수 (답글 포함).
+    // 자리표시로 남은 삭제 댓글도 목록에 그대로 보이므로 함께 센다
+    @Query("""
+            SELECT c.reviewId, COUNT(c)
+            FROM Comment c
+            WHERE c.reviewId IN :reviewIds
+            GROUP BY c.reviewId
+            """)
+    List<Object[]> countByReviewIds(@Param("reviewIds") List<Long> reviewIds);
+
+    // 리뷰 목록의 댓글 수를 한 번에 조회한다 (리뷰마다 count를 날리지 않기 위해).
+    // 댓글이 하나도 없는 리뷰는 키가 없으므로 호출부에서 0으로 채운다
+    default Map<Long, Long> countMapByReviewIds(List<Long> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+        return countByReviewIds(reviewIds).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+    }
 
     // 리뷰에 달린 댓글 id 전체 (답글 포함). 검열 결과를 함께 지우기 위해 필요하다
     @Query("SELECT c.id FROM Comment c WHERE c.reviewId = :reviewId")

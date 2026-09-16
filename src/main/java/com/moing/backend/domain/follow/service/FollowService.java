@@ -1,5 +1,6 @@
 package com.moing.backend.domain.follow.service;
 
+import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.follow.dto.FriendFeedResponse;
 import com.moing.backend.domain.follow.dto.FriendRequestResponse;
 import com.moing.backend.domain.follow.dto.FriendResponse;
@@ -41,6 +42,7 @@ public class FollowService {
     private final NotificationService notificationService;
     private final ReviewRepository reviewRepository;
     private final PlaceRepository placeRepository;
+    private final CommentRepository commentRepository;
 
     private static final int SEARCH_LIMIT = 20;
     private static final int FEED_MAX_LIMIT = 50;
@@ -263,6 +265,9 @@ public class FollowService {
                 .stream()
                 .collect(Collectors.toMap(Place::getId, p -> p));
 
+        Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
+                reviews.stream().map(Review::getId).toList());
+
         List<FriendFeedResponse.ReviewItem> items = reviews.stream()
                 .map(r -> {
                     User author = userMap.get(r.getUserId());
@@ -280,6 +285,7 @@ public class FollowService {
                             // 사진이 있는데도 동그라미가 비므로 큰 썸네일 -> 원본 순으로 폴백한다
                             firstNonNull(r.getThumbnailSmallUrl(), r.getThumbnailUrl(), r.getImageUrl()),
                             r.getVisibility() != null ? r.getVisibility() : Visibility.PUBLIC,
+                            commentCountMap.getOrDefault(r.getId(), 0L),
                             new FriendFeedResponse.UserInfo(
                                     author.getId(), author.getNickname(), author.getProfileUrl()),
                             r.getCreatedAt()

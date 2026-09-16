@@ -1,5 +1,6 @@
 package com.moing.backend.domain.user.service;
 
+import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.follow.entity.Follow;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
@@ -54,6 +55,7 @@ public class UserService {
     private final PlaceRepository placeRepository;
     private final NotificationRepository notificationRepository;
     private final FollowRepository followRepository;
+    private final CommentRepository commentRepository;
 
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -171,6 +173,9 @@ public class UserService {
         Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
                 .collect(Collectors.toMap(Place::getId, Function.identity()));
 
+        Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
+                reviews.stream().map(Review::getId).toList());
+
         LocalDateTime recentSince = LocalDateTime.now().minusHours(RECENT_HOURS);
 
         return reviews.stream().map(r -> {
@@ -186,7 +191,8 @@ public class UserService {
 
             return new UserReviewItem(
                     r.getId(), placeInfo, r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
-                    r.getCongestionLevel(), r.getComment(), visibilityOf(r), createdAt, isRecent);
+                    r.getCongestionLevel(), r.getComment(), visibilityOf(r),
+                    commentCountMap.getOrDefault(r.getId(), 0L), createdAt, isRecent);
         }).toList();
     }
 
@@ -204,6 +210,9 @@ public class UserService {
         Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
                 .collect(Collectors.toMap(Place::getId, Function.identity()));
 
+        Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
+                page.stream().map(Review::getId).toList());
+
         List<MyReviewListResponse.MyReviewItem> items = page.stream().map(r -> {
             Place place = placeMap.get(r.getPlaceId());
             MyReviewListResponse.PlaceInfo placeInfo = place != null
@@ -211,7 +220,8 @@ public class UserService {
                     : new MyReviewListResponse.PlaceInfo(r.getPlaceId(), null, null);
             return new MyReviewListResponse.MyReviewItem(
                     r.getId(), placeInfo, r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
-                    r.getCongestionLevel(), r.getComment(), visibilityOf(r), r.getCreatedAt());
+                    r.getCongestionLevel(), r.getComment(), visibilityOf(r),
+                    commentCountMap.getOrDefault(r.getId(), 0L), r.getCreatedAt());
         }).toList();
 
         return new MyReviewListResponse(items, nextCursor);

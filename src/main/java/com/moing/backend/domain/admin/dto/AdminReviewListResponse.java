@@ -13,7 +13,7 @@ public record AdminReviewListResponse(
         @JsonProperty("next_cursor") Long nextCursor
 ) {
     @JsonPropertyOrder({"id", "place_name", "image_url", "thumbnail_url", "thumbnail_small_url",
-            "congestion_level", "comment", "author_nickname", "status", "created_at"})
+            "congestion_level", "comment", "author_nickname", "status", "comment_count", "created_at"})
     public record ReviewItem(
             Long id,
             @JsonProperty("place_name") String placeName,
@@ -24,6 +24,8 @@ public record AdminReviewListResponse(
             String comment,
             @JsonProperty("author_nickname") String authorNickname,
             String status,
+            // 답글과 삭제된(자리표시) 댓글까지 포함한 수. 관리자 댓글 목록에 보이는 개수와 같다
+            @JsonProperty("comment_count") long commentCount,
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
             @JsonProperty("created_at") LocalDateTime createdAt
     ) {}

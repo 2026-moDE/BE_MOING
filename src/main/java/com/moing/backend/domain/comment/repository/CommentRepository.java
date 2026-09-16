@@ -37,6 +37,9 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     // 답글 존재 여부 (삭제 방식 결정용, 소프트 삭제된 답글도 부모를 붙들고 있으므로 포함한다)
     boolean existsByParentId(Long parentId);
 
+    // 리뷰 한 건의 댓글 수 (답글과 자리표시로 남은 삭제 댓글 포함)
+    long countByReviewId(Long reviewId);
+
     // 리뷰별 댓글 수 (답글 포함).
     // 자리표시로 남은 삭제 댓글도 목록에 그대로 보이므로 함께 센다
     @Query("""

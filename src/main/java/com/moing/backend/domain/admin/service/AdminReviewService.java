@@ -1,6 +1,7 @@
 package com.moing.backend.domain.admin.service;
 
 import com.moing.backend.domain.admin.dto.AdminReviewListResponse;
+import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.place.service.CongestionCacheService;
 import com.moing.backend.domain.review.repository.ReviewRepository;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -24,6 +26,7 @@ public class AdminReviewService {
 
     private final ReviewRepository reviewRepository;
     private final CongestionCacheService congestionCacheService;
+    private final CommentRepository commentRepository;
 
     public AdminReviewListResponse getReviews(String status, Long cursor, Integer limit) {
         if (limit == null) limit = 20;
@@ -44,14 +47,18 @@ public class AdminReviewService {
         List<Object[]> page = hasNext ? rows.subList(0, limit) : rows;
         Long nextCursor = hasNext ? ((Number) page.get(page.size() - 1)[0]).longValue() : null;
 
+        Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
+                page.stream().map(row -> ((Number) row[0]).longValue()).toList());
+
         List<AdminReviewListResponse.ReviewItem> items = page.stream().map(row -> {
+            Long reviewId = ((Number) row[0]).longValue();
             boolean isBlinded = Boolean.TRUE.equals(row[6]);
             String dbStatus = (String) row[7];
             String derivedStatus = isBlinded ? "BLINDED" : dbStatus;
             String nickname = row[5] != null ? (String) row[5] : "(탈퇴한 사용자)";
 
             return new AdminReviewListResponse.ReviewItem(
-                    ((Number) row[0]).longValue(),
+                    reviewId,
                     (String) row[1],       // place_name (nullable)
                     (String) row[2],       // image_url
                     (String) row[9],       // thumbnail_url
@@ -60,6 +67,7 @@ public class AdminReviewService {
                     (String) row[4],       // comment
                     nickname,
                     derivedStatus,
+                    commentCountMap.getOrDefault(reviewId, 0L),
                     (LocalDateTime) row[8] // created_at
             );
         }).toList();

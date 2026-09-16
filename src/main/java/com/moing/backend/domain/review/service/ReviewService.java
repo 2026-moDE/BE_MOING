@@ -93,6 +93,7 @@ public class ReviewService {
                 isMine,
                 review.getVisibility() != null ? review.getVisibility() : Visibility.PUBLIC,
                 isFriend,
+                commentRepository.countByReviewId(review.getId()),
                 userInfo,
                 review.getCreatedAt()
         );
@@ -283,6 +284,9 @@ public class ReviewService {
         Set<Long> friendIds = otherUserIds.isEmpty() ? Set.of()
                 : Set.copyOf(followRepository.findAcceptedFollowingIds(userId, otherUserIds));
 
+        Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
+                page.stream().map(Review::getId).toList());
+
         List<ReviewListResponse.ReviewItem> items = page.stream()
                 .map(r -> {
                     User user = userMap.get(r.getUserId());
@@ -296,7 +300,8 @@ public class ReviewService {
                             r.getId(), r.getImageUrl(), r.getThumbnailUrl(), r.getThumbnailSmallUrl(),
                             r.getCongestionLevel(), r.getComment(), isMine,
                             r.getVisibility() != null ? r.getVisibility() : Visibility.PUBLIC,
-                            isFriend, userInfo, r.getCreatedAt()
+                            isFriend, commentCountMap.getOrDefault(r.getId(), 0L),
+                            userInfo, r.getCreatedAt()
                     );
                 })
                 .toList();

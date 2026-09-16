@@ -69,6 +69,12 @@ public class User {
     @Column(name = "marketing_agreed", nullable = false)
     private boolean marketingAgreed = false;
 
+    // 알림함에 마지막으로 들어온 시각. 이 시각 이후에 도착한 알림이 있으면
+    // 알림 아이콘에 점을 띄운다. 개별 읽음(is_read)과는 별개다.
+    // 한 번도 안 들어온 유저는 null이고, 알림이 하나라도 있으면 점이 켜진다
+    @Column(name = "notifications_checked_at")
+    private LocalDateTime notificationsCheckedAt;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -121,10 +127,18 @@ public class User {
         return profileImageUrl.replace("/profile_original/", "/profile/");
     }
 
+    // 알림함 방문 시각을 지금으로 갱신 (알림 아이콘의 점을 끈다)
+    public void markNotificationsChecked() {
+        this.notificationsCheckedAt = LocalDateTime.now();
+    }
+
     // 탈퇴 후 재가입 시 계정 복구 (deleted_at 초기화 및 약관 동의 초기화)
     public void restore(String fcmToken) {
         this.deletedAt = null;
         this.fcmToken = fcmToken;
+        // 탈퇴는 소프트 딜리트라 옛 알림이 그대로 남아 있다. 재가입 시점을 방문 시각으로
+        // 찍어, 탈퇴 전 알림 때문에 점이 켜진 상태로 시작하지 않게 한다
+        this.notificationsCheckedAt = LocalDateTime.now();
         this.termsAgreed = false;
         this.locationTermsAgreed = false;
         this.privacyAgreed = false;

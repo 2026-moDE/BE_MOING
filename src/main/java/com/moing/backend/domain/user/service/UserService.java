@@ -262,8 +262,19 @@ public class UserService {
         return new NotificationListResponse(items, nextCursor);
     }
 
+    /**
+     * 알림 아이콘에 점을 띄울지 여부.
+     *
+     * <p>개별 읽음이 아니라 알림함 방문 시각으로 판단한다. 알림함에 들어가면
+     * (POST /api/notifications/visit) 꺼지고, 그 뒤 새 알림이 오면 다시 켜진다.
+     * 응답 키(has_unread)는 클라이언트 호환을 위해 그대로 둔다.
+     */
     public UnreadNotificationResponse hasUnreadNotifications(Long userId) {
-        return new UnreadNotificationResponse(notificationRepository.existsUnread(userId));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        return new UnreadNotificationResponse(
+                notificationRepository.existsArrivedAfter(userId, user.getNotificationsCheckedAt()));
     }
 
     @Transactional

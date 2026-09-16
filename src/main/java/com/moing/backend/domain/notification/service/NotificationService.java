@@ -33,6 +33,28 @@ public class NotificationService {
         notification.markAsRead();
     }
 
+    // 알림함 방문 기록. 개별 읽음 상태는 건드리지 않고 방문 시각만 갱신한다
+    @Transactional
+    public void markVisited(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        user.markNotificationsChecked();
+    }
+
+    @Transactional
+    public void delete(Long userId, Long notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
+        // 남의 알림 id를 넣어 지울 수 없다 (읽음 처리와 같은 규칙)
+        if (!notification.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        notificationRepository.delete(notification);
+    }
+
     // 알림 저장 + FCM 발송. 탈퇴한 유저에게는 보내지 않는다
     @Transactional
     public void send(Long targetUserId, NotificationType type, Long placeId, Long reviewId,

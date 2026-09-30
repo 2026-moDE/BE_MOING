@@ -14,7 +14,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("""
             SELECT n FROM Notification n
             WHERE n.userId = :userId
-              AND (:cursor IS NULL OR n.id < :cursor)
+              AND (CAST(:cursor AS Long) IS NULL OR n.id < :cursor)
             ORDER BY n.id DESC
             """)
     List<Notification> findByUserId(
@@ -33,7 +33,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("""
             SELECT COUNT(n) > 0 FROM Notification n
             WHERE n.userId = :userId
-              AND (:checkedAt IS NULL OR n.createdAt > :checkedAt)
+              AND (CAST(:checkedAt AS LocalDateTime) IS NULL OR n.createdAt > :checkedAt)
             """)
     boolean existsArrivedAfter(@Param("userId") Long userId,
                                @Param("checkedAt") LocalDateTime checkedAt);

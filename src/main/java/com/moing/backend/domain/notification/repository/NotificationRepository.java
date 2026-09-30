@@ -3,6 +3,7 @@ package com.moing.backend.domain.notification.repository;
 import com.moing.backend.domain.notification.entity.Notification;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -37,4 +38,14 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             """)
     boolean existsArrivedAfter(@Param("userId") Long userId,
                                @Param("checkedAt") LocalDateTime checkedAt);
+
+    /**
+     * 리뷰 삭제 시 그 리뷰로 이동하는 알림 정리.
+     *
+     * <p>notifications.review_id에는 DB FK(notifications_review_id_fkey)가 걸려 있어
+     * 이 정리를 빠뜨리면 리뷰 삭제 자체가 제약 위반으로 실패한다.
+     */
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.reviewId = :reviewId")
+    int deleteAllByReviewId(@Param("reviewId") Long reviewId);
 }

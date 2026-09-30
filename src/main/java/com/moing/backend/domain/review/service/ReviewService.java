@@ -6,6 +6,7 @@ import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.reaction.repository.ReactionRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
+import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.notification.service.NotificationService;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.entity.PlaceSubscription;
@@ -53,6 +54,7 @@ public class ReviewService {
     private final CommentRepository commentRepository;
     private final CommentModerationRepository commentModerationRepository;
     private final ReactionRepository reactionRepository;
+    private final NotificationRepository notificationRepository;
 
     // 리뷰 상세 조회
     @Transactional(readOnly = true)
@@ -117,8 +119,13 @@ public class ReviewService {
 
         Long placeId = review.getPlaceId();
 
-        // DB에 FK가 없어 cascade가 걸리지 않는다. 남겨두면 어느 화면에도 안 나오는 고아 행이 되므로
-        // 자식부터 직접 지운다. 같은 트랜잭션이라 중간에 실패하면 전부 롤백된다.
+        // 엔티티는 review_id를 연관관계 없이 스칼라로만 들고 있어 JPA cascade가 걸리지 않는다.
+        // 반면 DB에는 FK가 있어(notifications_review_id_fkey) 자식을 남겨두면 리뷰 삭제 자체가
+        // 제약 위반으로 실패한다. FK가 없는 테이블도 남겨두면 어느 화면에도 안 나오는 고아 행이 되므로
+        // 어느 쪽이든 자식부터 직접 지운다. 같은 트랜잭션이라 중간에 실패하면 전부 롤백된다.
+        // 새로 reviews를 참조하는 테이블이 생기면 이 블록에 정리를 추가해야 한다.
+        notificationRepository.deleteAllByReviewId(reviewId);
+        reviewReportRepository.deleteAllByReviewId(reviewId);
         reactionRepository.deleteAllByReviewId(reviewId);
 
         // 답글도 review_id를 갖고 있어 최상위 댓글과 함께 지워진다

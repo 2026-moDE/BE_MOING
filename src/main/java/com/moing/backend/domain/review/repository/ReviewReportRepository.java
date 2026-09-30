@@ -3,6 +3,7 @@ package com.moing.backend.domain.review.repository;
 import com.moing.backend.domain.review.entity.ReportStatus;
 import com.moing.backend.domain.review.entity.ReviewReport;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,4 +28,9 @@ public interface ReviewReportRepository extends JpaRepository<ReviewReport, Long
             @Param("status") ReportStatus status,
             @Param("cursor") Long cursor,
             Pageable pageable);
+
+    // 리뷰 삭제 시 딸린 신고 정리. 대상 리뷰가 사라지면 관리자 화면에서도 다룰 수 없는 행이 된다
+    @Modifying
+    @Query("DELETE FROM ReviewReport r WHERE r.reviewId = :reviewId")
+    int deleteAllByReviewId(@Param("reviewId") Long reviewId);
 }

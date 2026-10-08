@@ -43,6 +43,11 @@ public class PieceService {
     // 손으로 살짝 비뚼 정도까지만 허용한다 (단위: 도)
     private static final int MIN_ROTATION = -16;
     private static final int MAX_ROTATION = 16;
+    // 배율. 원래 크기의 절반~두 배까지만 허용한다
+    private static final BigDecimal MIN_SCALE = new BigDecimal("0.5");
+    private static final BigDecimal MAX_SCALE = new BigDecimal("2.0");
+    // DECIMAL(3,2) 컬럼과 같은 자리수
+    private static final int SCALE_SCALE = 2;
 
     private final PieceRepository pieceRepository;
     private final ReviewRepository reviewRepository;
@@ -153,7 +158,8 @@ public class PieceService {
             piece.place(
                     normalizePosition(item.positionX()),
                     normalizePosition(item.positionY()),
-                    toRotation(item.rotation()));
+                    toRotation(item.rotation()),
+                    toScale(item.scale()));
         }
 
         return new PiecePositionUpdateResponse(pieceIds.size());
@@ -200,6 +206,17 @@ public class PieceService {
         return (short) value;
     }
 
+    private BigDecimal toScale(BigDecimal scale) {
+        // rotation과 같은 규칙. 생략은 "원래 크기"로 본다
+        if (scale == null) {
+            return Piece.DEFAULT_SCALE;
+        }
+        if (scale.compareTo(MIN_SCALE) < 0 || scale.compareTo(MAX_SCALE) > 0) {
+            throw new CustomException(ErrorCode.INVALID_PIECE_POSITION);
+        }
+        return scale.setScale(SCALE_SCALE, RoundingMode.HALF_UP);
+    }
+
     /**
      * 조각에 원본 리뷰의 작성 시각과 장소를 붙여 내려준다.
      *
@@ -235,6 +252,8 @@ public class PieceService {
                             p.getId(), p.getReviewId(), p.getImageUrl(), p.getName(),
                             includeVisibility ? p.getVisibility() : null,
                             p.getPositionX(), p.getPositionY(), p.getRotation(),
+                            // scale 도입 이전 조각은 컬럼 default로 채워지지만, 값이 비면 기본값으로 내린다
+                            p.getScale() != null ? p.getScale() : Piece.DEFAULT_SCALE,
                             placeInfo, review.getCreatedAt());
                 })
                 .sorted(Comparator.comparing(PieceListResponse.PieceItem::createdAt).reversed()

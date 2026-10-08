@@ -27,7 +27,7 @@ public record PieceListResponse(
     ) {}
 
     @JsonPropertyOrder({"id", "review_id", "image_url", "name", "visibility",
-            "position_x", "position_y", "rotation", "place", "created_at"})
+            "position_x", "position_y", "rotation", "scale", "place", "created_at"})
     public record PieceItem(
             Long id,
             @JsonProperty("review_id") Long reviewId,
@@ -39,6 +39,8 @@ public record PieceListResponse(
             @JsonProperty("position_x") BigDecimal positionX,
             @JsonProperty("position_y") BigDecimal positionY,
             short rotation,
+            // 미설정(scale 도입 이전) 조각도 1.00으로 내려간다
+            BigDecimal scale,
             PlaceInfo place,
             // 조각을 만든 시각이 아니라 원본 리뷰의 작성 시각
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")

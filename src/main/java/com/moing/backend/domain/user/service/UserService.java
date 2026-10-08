@@ -6,6 +6,7 @@ import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.Notification;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
+import com.moing.backend.domain.piece.repository.PieceRepository;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.repository.PlaceRepository;
 import com.moing.backend.domain.place.repository.PlaceSubscriptionRepository;
@@ -56,6 +57,7 @@ public class UserService {
     private final NotificationRepository notificationRepository;
     private final FollowRepository followRepository;
     private final CommentRepository commentRepository;
+    private final PieceRepository pieceRepository;
 
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -63,6 +65,8 @@ public class UserService {
 
         long reviewCount = reviewRepository.countByUserId(userId);
         long placeCount = reviewRepository.countDistinctPlaceIdByUserId(userId);
+        // 비공개 조각까지 포함한다 (본인 프로필이므로)
+        long pieceCount = pieceRepository.countByUserId(userId);
         long subscriptionCount = placeSubscriptionRepository.countByUserId(userId);
         long friendCount = followRepository.countFriends(userId);
 
@@ -74,6 +78,7 @@ public class UserService {
                 user.getProfileUrl(),
                 reviewCount,
                 placeCount,
+                pieceCount,
                 subscriptionCount,
                 friendCount
         );

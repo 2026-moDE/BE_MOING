@@ -8,6 +8,7 @@ import com.moing.backend.domain.reaction.repository.ReactionRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
 import com.moing.backend.domain.notification.repository.NotificationRepository;
 import com.moing.backend.domain.notification.service.NotificationService;
+import com.moing.backend.domain.piece.repository.PieceRepository;
 import com.moing.backend.domain.place.entity.Place;
 import com.moing.backend.domain.place.entity.PlaceSubscription;
 import com.moing.backend.domain.place.repository.PlaceRepository;
@@ -55,6 +56,7 @@ public class ReviewService {
     private final CommentModerationRepository commentModerationRepository;
     private final ReactionRepository reactionRepository;
     private final NotificationRepository notificationRepository;
+    private final PieceRepository pieceRepository;
 
     // 리뷰 상세 조회
     @Transactional(readOnly = true)
@@ -127,6 +129,9 @@ public class ReviewService {
         notificationRepository.deleteAllByReviewId(reviewId);
         reviewReportRepository.deleteAllByReviewId(reviewId);
         reactionRepository.deleteAllByReviewId(reviewId);
+        // 조각은 리뷰의 작성 시각·장소를 끌어다 쓰므로 원본이 사라지면 보드에 그릴 수 없다.
+        // (리뷰가 ARCHIVED가 되는 것은 삭제가 아니라 상태 변화라 조각이 그대로 남는다)
+        pieceRepository.deleteAllByReviewId(reviewId);
 
         // 답글도 review_id를 갖고 있어 최상위 댓글과 함께 지워진다
         List<Long> commentIds = commentRepository.findIdsByReviewId(reviewId);

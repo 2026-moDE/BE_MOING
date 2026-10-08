@@ -7,10 +7,10 @@ package com.moing.backend.domain.review.entity;
  */
 public enum CongestionLevel {
 
-    RELAXED("한산해요", BubbleColor.GREEN),
-    MODERATE("적당해요", BubbleColor.GREEN),
-    CROWDED("붐벼요", BubbleColor.YELLOW),
-    VERY_CROWDED("매우 붐벼요", BubbleColor.RED);
+    RELAXED("여유", BubbleColor.GREEN),
+    MODERATE("보통", BubbleColor.GREEN),
+    CROWDED("약간 붐빔", BubbleColor.YELLOW),
+    VERY_CROWDED("붐빔", BubbleColor.RED);
 
     private final String label;
     private final BubbleColor bubbleColor;

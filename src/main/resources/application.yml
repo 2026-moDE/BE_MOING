@@ -49,6 +49,8 @@ naver:
 
 seoul:
   city-data-api-key: ${SEOUL_CITY_DATA_API_KEY:}
+  # 기동 시 지역 목록 동기화. 외부 호출을 피하고 싶은 로컬·테스트에서만 끈다.
+  area-sync-on-startup: ${SEOUL_AREA_SYNC_ON_STARTUP:true}
 
 aws:
   s3:

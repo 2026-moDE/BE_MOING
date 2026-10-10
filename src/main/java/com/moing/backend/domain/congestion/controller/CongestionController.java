@@ -20,18 +20,17 @@ public class CongestionController {
 
     private final CongestionService congestionService;
 
-    // 근처 지역 실시간 혼잡도 조회
+    // 기준 좌표에서 가장 가까운 지역의 실시간 혼잡도 + 12시간 예측
     @GetMapping("/nearby")
     public ResponseEntity<ApiResponse<CongestionResponse>> getNearbyCongestion(
             @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) Double latitude,
-            @RequestParam(required = false) Double longitude,
-            @RequestParam(defaultValue = "500") int radius
+            @RequestParam(required = false) Double longitude
     ) {
         if (latitude == null || longitude == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
         return ResponseEntity.ok(ApiResponse.success(
-                congestionService.getNearbyCongestion(latitude, longitude, radius)));
+                congestionService.getNearbyCongestion(latitude, longitude)));
     }
 }

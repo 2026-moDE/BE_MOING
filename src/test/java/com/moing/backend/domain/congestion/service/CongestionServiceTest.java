@@ -1,9 +1,11 @@
 package com.moing.backend.domain.congestion.service;
 
 import com.moing.backend.domain.congestion.dto.CongestionResponse;
-import com.moing.backend.domain.place.repository.PlaceRepository;
+import com.moing.backend.domain.congestion.entity.SeoulArea;
+import com.moing.backend.domain.congestion.repository.SeoulAreaRepository;
 import com.moing.backend.domain.review.entity.CongestionLevel;
-import com.moing.backend.domain.review.repository.ReviewRepository;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import com.moing.backend.global.infra.SeoulCityDataResponse;
 import com.moing.backend.global.infra.SeoulPublicDataService;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,55 +13,42 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.data.domain.Pageable;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 공공 데이터 기반 혼잡도 조회 테스트
- * 지역명은 공공 API의 조회 키라, 서울시 공식 장소명과 정확히 일치하는지도 함께 검증한다.
+ * 서울시 도시데이터 기반 지역 혼잡도 조회 테스트
  */
 class CongestionServiceTest {
 
-    private PlaceRepository placeRepository;
-    private ReviewRepository reviewRepository;
+    private static final double LATITUDE = 37.54297;
+    private static final double LONGITUDE = 127.05660;
+    private static final String AREA_NAME = "성수카페거리";
+    private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2026, 10, 10, 11, 15);
+
+    private SeoulAreaRepository seoulAreaRepository;
     private SeoulPublicDataService seoulPublicDataService;
     private CongestionService congestionService;
 
     @BeforeEach
     void setUp() {
-        placeRepository = mock(PlaceRepository.class);
-        reviewRepository = mock(ReviewRepository.class);
+        seoulAreaRepository = mock(SeoulAreaRepository.class);
         seoulPublicDataService = mock(SeoulPublicDataService.class);
-        congestionService = new CongestionService(placeRepository, reviewRepository, seoulPublicDataService);
+        congestionService = new CongestionService(seoulAreaRepository, seoulPublicDataService);
 
-        // 리뷰가 없는 상태 = 항상 공공 API 경로를 타도록
-        when(placeRepository.findNearbyAll(anyDouble(), anyDouble(), anyInt())).thenReturn(List.of());
-        when(reviewRepository.countByPlaceIdsAndCreatedAtAfter(anyList(), any())).thenReturn(0L);
-    }
-
-    @Test
-    @DisplayName("하드코딩된 지역명이 모두 서울시 공식 장소명이다")
-    void 지역명이_공식_장소명과_일치한다() throws IOException {
-        Set<String> official = officialAreaNames();
-
-        assertThat(configuredAreaNames()).allSatisfy(name ->
-                assertThat(official).as("서울시 공식 장소명에 없는 지역명: %s", name).contains(name));
+        when(seoulAreaRepository.findNearest(anyDouble(), anyDouble(), anyInt(), any(Pageable.class)))
+                .thenReturn(List.of(SeoulArea.of(AREA_NAME, "발달상권", LATITUDE, LONGITUDE, UPDATED_AT)));
     }
 
     @ParameterizedTest
@@ -71,69 +60,102 @@ class CongestionServiceTest {
     })
     @DisplayName("공공 API 혼잡도 문자열을 CongestionLevel로 매핑한다")
     void 공공_혼잡도를_매핑한다(String publicLevel, CongestionLevel expected) {
-        when(seoulPublicDataService.fetchPopulation(anyString()))
-                .thenReturn(new SeoulCityDataResponse.Row("서울역", publicLevel, 18000, 20000));
+        givenRow(row(publicLevel, List.of()));
 
-        CongestionResponse.AreaItem item = firstAreaNear(37.55659, 126.97303);
-
-        assertThat(item.congestionLevel()).isEqualTo(expected);
-        assertThat(item.congestionLabel()).isEqualTo(expected.getLabel());
-        assertThat(item.bubbleColor()).isEqualTo(expected.getBubbleColor());
+        assertThat(nearby().congestionLevel()).isEqualTo(expected);
     }
 
     @Test
-    @DisplayName("공공 API 인구수는 min·max의 평균으로 내려준다")
-    void 인구수는_평균값이다() {
-        when(seoulPublicDataService.fetchPopulation(anyString()))
-                .thenReturn(new SeoulCityDataResponse.Row("서울역", "여유", 18000, 20000));
+    @DisplayName("지역명·설명 문구·인구 상하한·기준 시각을 가공 없이 내려준다")
+    void 응답_필드를_그대로_내려준다() {
+        givenRow(row("붐빔", List.of()));
 
-        assertThat(firstAreaNear(37.55659, 126.97303).population()).isEqualTo(19000);
-        assertThat(firstAreaNear(37.55659, 126.97303).source()).isEqualTo("PUBLIC");
+        CongestionResponse response = nearby();
+
+        assertThat(response.areaName()).isEqualTo(AREA_NAME);
+        assertThat(response.congestionMessage()).isEqualTo("사람이 많아 붐벼요.");
+        // min·max를 평균으로 뭉개지 않고 둘 다 내려야 추이 띠에 범위를 그릴 수 있다
+        assertThat(response.populationMin()).isEqualTo(16000);
+        assertThat(response.populationMax()).isEqualTo(18000);
+        // 호출 시각이 아니라 서울시 데이터 기준 시각이다
+        assertThat(response.updatedAt()).isEqualTo(UPDATED_AT);
     }
 
     @Test
-    @DisplayName("공공 API가 데이터를 못 주면 해당 지역은 응답에서 제외한다")
-    void 공공데이터가_없으면_제외된다() {
-        when(seoulPublicDataService.fetchPopulation(anyString())).thenReturn(null);
+    @DisplayName("예측은 12시간치를 그대로 내려준다")
+    void 예측을_전부_내려준다() {
+        givenRow(row("여유", forecasts(12)));
 
-        assertThat(congestionService.getNearbyCongestion(37.55659, 126.97303, 500).areas()).isEmpty();
+        List<CongestionResponse.ForecastItem> forecast = nearby().forecast();
+
+        assertThat(forecast).hasSize(12);
+        assertThat(forecast.get(0).time()).isEqualTo(LocalDateTime.of(2026, 10, 10, 12, 0));
+        assertThat(forecast.get(0).congestionLevel()).isEqualTo(CongestionLevel.CROWDED);
+        assertThat(forecast.get(0).populationMin()).isEqualTo(28000);
+        assertThat(forecast.get(0).populationMax()).isEqualTo(30000);
+        assertThat(forecast.get(11).time()).isEqualTo(LocalDateTime.of(2026, 10, 10, 23, 0));
     }
 
     @Test
-    @DisplayName("반경 밖 지역은 조회하지 않는다")
-    void 반경_밖_지역은_제외된다() {
-        when(seoulPublicDataService.fetchPopulation(anyString()))
-                .thenReturn(new SeoulCityDataResponse.Row("서울역", "여유", 18000, 20000));
+    @DisplayName("예측이 12건을 넘게 와도 12건까지만 내려준다")
+    void 예측은_12건으로_자른다() {
+        givenRow(row("여유", forecasts(24)));
 
-        // 서울역 기준 500m 안에 다른 주요 지역은 없다
-        assertThat(congestionService.getNearbyCongestion(37.55659, 126.97303, 500).areas())
-                .extracting(CongestionResponse.AreaItem::name)
-                .containsExactly("서울역");
+        assertThat(nearby().forecast()).hasSize(12);
     }
 
-    private CongestionResponse.AreaItem firstAreaNear(double latitude, double longitude) {
-        List<CongestionResponse.AreaItem> areas =
-                congestionService.getNearbyCongestion(latitude, longitude, 500).areas();
-        assertThat(areas).isNotEmpty();
-        return areas.get(0);
+    @Test
+    @DisplayName("예측이 없는 지역은 빈 배열을 내려준다")
+    void 예측이_없으면_빈_배열이다() {
+        givenRow(new SeoulCityDataResponse.Row(
+                AREA_NAME, "POI068", "여유", "여유로워요.", 4000, 6000, UPDATED_AT, "N", null));
+
+        assertThat(nearby().forecast()).isEmpty();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<String> configuredAreaNames() {
-        List<Object> areas = (List<Object>) ReflectionTestUtils.getField(CongestionService.class, "SEOUL_AREAS");
-        assertThat(areas).isNotNull().isNotEmpty();
-        return areas.stream()
-                .map(area -> String.valueOf(ReflectionTestUtils.invokeGetterMethod(area, "name")))
+    @Test
+    @DisplayName("반경 내 지역이 없으면 404로 끊는다")
+    void 반경_내_지역이_없으면_404다() {
+        when(seoulAreaRepository.findNearest(anyDouble(), anyDouble(), anyInt(), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(this::nearby)
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.AREA_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("서울시 응답을 못 받으면 502로 알린다")
+    void 서울시_응답이_없으면_502다() {
+        givenRow(null);
+
+        assertThatThrownBy(this::nearby)
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.EXTERNAL_API_ERROR);
+    }
+
+    private CongestionResponse nearby() {
+        return congestionService.getNearbyCongestion(LATITUDE, LONGITUDE);
+    }
+
+    private void givenRow(SeoulCityDataResponse.Row row) {
+        when(seoulPublicDataService.fetchPopulation(anyString())).thenReturn(row);
+    }
+
+    private SeoulCityDataResponse.Row row(String congestLvl, List<SeoulCityDataResponse.Forecast> forecast) {
+        return new SeoulCityDataResponse.Row(
+                AREA_NAME, "POI068", congestLvl, "사람이 많아 붐벼요.",
+                16000, 18000, UPDATED_AT, "Y", forecast);
+    }
+
+    /** 12:00부터 1시간 간격 — 서울시 응답과 같은 모양 */
+    private List<SeoulCityDataResponse.Forecast> forecasts(int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(i -> new SeoulCityDataResponse.Forecast(
+                        LocalDateTime.of(2026, 10, 10, 12, 0).plusHours(i),
+                        "약간 붐빔", 28000 + i * 1000, 30000 + i * 1000))
                 .toList();
-    }
-
-    private Set<String> officialAreaNames() throws IOException {
-        try (InputStream in = getClass().getResourceAsStream("/fixture/seoul-official-area-names.txt")) {
-            assertThat(in).as("공식 장소명 픽스처").isNotNull();
-            return Arrays.stream(new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n"))
-                    .map(String::trim)
-                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
-                    .collect(Collectors.toSet());
-        }
     }
 }

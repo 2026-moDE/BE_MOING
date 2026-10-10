@@ -51,6 +51,10 @@ public enum ErrorCode {
     NOT_OWN_PIECE(HttpStatus.FORBIDDEN, "본인의 조각만 수정할 수 있습니다"),
     INVALID_PIECE_POSITION(HttpStatus.BAD_REQUEST, "조각 위치 값이 올바르지 않습니다"),
 
+    // --- 지역 혼잡도 관련 ---
+    AREA_NOT_FOUND(HttpStatus.NOT_FOUND, "주변에 서울시 실시간 도시데이터 지역이 없습니다"),
+    EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "외부 API 응답에 실패했습니다"),
+
     // --- 관리자 관련 ---
     ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");
 

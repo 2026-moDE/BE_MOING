@@ -3,21 +3,30 @@ package com.moing.backend.domain.congestion.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.moing.backend.domain.review.entity.CongestionLevel;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
-public record CongestionResponse(List<AreaItem> areas) {
+/**
+ * 지역 혼잡도 응답 (서울시 실시간 도시데이터 기반).
+ *
+ * <p>유저 제보 기반 혼잡도는 장소 상세(GET /api/places/{id})에서 따로 내려준다.
+ */
+public record CongestionResponse(
+        @JsonProperty("area_name") String areaName,
+        @JsonProperty("congestion_level") CongestionLevel congestionLevel,
+        @JsonProperty("congestion_message") String congestionMessage,
+        @JsonProperty("population_min") Integer populationMin,
+        @JsonProperty("population_max") Integer populationMax,
 
-    public record AreaItem(
-            String name,
+        /** 서울시 데이터 기준 시각(KST). 화면에 "10.10 11:15 기준"으로 함께 띄운다. */
+        @JsonProperty("updated_at") LocalDateTime updatedAt,
+
+        List<ForecastItem> forecast
+) {
+    public record ForecastItem(
+            LocalDateTime time,
             @JsonProperty("congestion_level") CongestionLevel congestionLevel,
-            @JsonProperty("congestion_label") String congestionLabel,
-            @JsonProperty("bubble_color") CongestionLevel.BubbleColor bubbleColor,
-            Integer population,
-            String source
-    ) {
-        // 라벨·색상은 항상 혼잡도 단계에서 파생시켜 값이 어긋나지 않게 한다
-        public static AreaItem of(String name, CongestionLevel level, Integer population, String source) {
-            return new AreaItem(name, level, level.getLabel(), level.getBubbleColor(), population, source);
-        }
-    }
+            @JsonProperty("population_min") Integer populationMin,
+            @JsonProperty("population_max") Integer populationMax
+    ) {}
 }

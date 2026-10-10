@@ -30,7 +30,7 @@ public class CongestionController {
         if (latitude == null || longitude == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
-        return ResponseEntity.ok(ApiResponse.success(
+        return ResponseEntity.ok(ApiResponse.success("success",
                 congestionService.getNearbyCongestion(latitude, longitude)));
     }
 }

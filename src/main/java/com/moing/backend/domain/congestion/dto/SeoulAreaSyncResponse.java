@@ -1,5 +1,6 @@
 package com.moing.backend.domain.congestion.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
@@ -11,5 +12,6 @@ public record SeoulAreaSyncResponse(
         @JsonProperty("updated_count") int updatedCount,
         @JsonProperty("removed_count") int removedCount,
         @JsonProperty("skipped_count") int skippedCount,
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
         @JsonProperty("synced_at") LocalDateTime syncedAt
 ) {}

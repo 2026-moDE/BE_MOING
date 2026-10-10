@@ -35,7 +35,10 @@ class CongestionServiceTest {
     private static final double LATITUDE = 37.54297;
     private static final double LONGITUDE = 127.05660;
     private static final String AREA_NAME = "성수카페거리";
-    private static final LocalDateTime UPDATED_AT = LocalDateTime.of(2026, 10, 10, 11, 15);
+    // 서울시는 KST로 내려주고, SeoulCityDataResponse가 UTC로 바꿔 담는다
+    private static final LocalDateTime SEOUL_TIME_KST = LocalDateTime.of(2026, 10, 10, 11, 15);
+    private static final LocalDateTime EXPECTED_UTC = LocalDateTime.of(2026, 10, 10, 2, 15);
+    private static final LocalDateTime FORECAST_START_KST = LocalDateTime.of(2026, 10, 10, 12, 0);
 
     private SeoulAreaRepository seoulAreaRepository;
     private SeoulPublicDataService seoulPublicDataService;
@@ -48,7 +51,7 @@ class CongestionServiceTest {
         congestionService = new CongestionService(seoulAreaRepository, seoulPublicDataService);
 
         when(seoulAreaRepository.findNearest(anyDouble(), anyDouble(), anyInt(), any(Pageable.class)))
-                .thenReturn(List.of(SeoulArea.of(AREA_NAME, "발달상권", LATITUDE, LONGITUDE, UPDATED_AT)));
+                .thenReturn(List.of(SeoulArea.of(AREA_NAME, "발달상권", LATITUDE, LONGITUDE, SEOUL_TIME_KST)));
     }
 
     @ParameterizedTest
@@ -77,8 +80,8 @@ class CongestionServiceTest {
         // min·max를 평균으로 뭉개지 않고 둘 다 내려야 추이 띠에 범위를 그릴 수 있다
         assertThat(response.populationMin()).isEqualTo(16000);
         assertThat(response.populationMax()).isEqualTo(18000);
-        // 호출 시각이 아니라 서울시 데이터 기준 시각이다
-        assertThat(response.updatedAt()).isEqualTo(UPDATED_AT);
+        // 호출 시각이 아니라 서울시 데이터 기준 시각이고, KST가 아니라 UTC로 내려간다
+        assertThat(response.updatedAt()).isEqualTo(EXPECTED_UTC);
     }
 
     @Test
@@ -89,11 +92,12 @@ class CongestionServiceTest {
         List<CongestionResponse.ForecastItem> forecast = nearby().forecast();
 
         assertThat(forecast).hasSize(12);
-        assertThat(forecast.get(0).time()).isEqualTo(LocalDateTime.of(2026, 10, 10, 12, 0));
+        // KST 12:00 → UTC 03:00
+        assertThat(forecast.get(0).time()).isEqualTo(LocalDateTime.of(2026, 10, 10, 3, 0));
         assertThat(forecast.get(0).congestionLevel()).isEqualTo(CongestionLevel.CROWDED);
         assertThat(forecast.get(0).populationMin()).isEqualTo(28000);
         assertThat(forecast.get(0).populationMax()).isEqualTo(30000);
-        assertThat(forecast.get(11).time()).isEqualTo(LocalDateTime.of(2026, 10, 10, 23, 0));
+        assertThat(forecast.get(11).time()).isEqualTo(LocalDateTime.of(2026, 10, 10, 14, 0));
     }
 
     @Test
@@ -108,7 +112,7 @@ class CongestionServiceTest {
     @DisplayName("예측이 없는 지역은 빈 배열을 내려준다")
     void 예측이_없으면_빈_배열이다() {
         givenRow(new SeoulCityDataResponse.Row(
-                AREA_NAME, "POI068", "여유", "여유로워요.", 4000, 6000, UPDATED_AT, "N", null));
+                AREA_NAME, "POI068", "여유", "여유로워요.", 4000, 6000, SEOUL_TIME_KST, "N", null));
 
         assertThat(nearby().forecast()).isEmpty();
     }
@@ -147,14 +151,14 @@ class CongestionServiceTest {
     private SeoulCityDataResponse.Row row(String congestLvl, List<SeoulCityDataResponse.Forecast> forecast) {
         return new SeoulCityDataResponse.Row(
                 AREA_NAME, "POI068", congestLvl, "사람이 많아 붐벼요.",
-                16000, 18000, UPDATED_AT, "Y", forecast);
+                16000, 18000, SEOUL_TIME_KST, "Y", forecast);
     }
 
-    /** 12:00부터 1시간 간격 — 서울시 응답과 같은 모양 */
+    /** KST 12:00부터 1시간 간격 — 서울시 응답과 같은 모양 */
     private List<SeoulCityDataResponse.Forecast> forecasts(int count) {
         return java.util.stream.IntStream.range(0, count)
                 .mapToObj(i -> new SeoulCityDataResponse.Forecast(
-                        LocalDateTime.of(2026, 10, 10, 12, 0).plusHours(i),
+                        FORECAST_START_KST.plusHours(i),
                         "약간 붐빔", 28000 + i * 1000, 30000 + i * 1000))
                 .toList();
     }

@@ -56,8 +56,9 @@ class SeoulPublicDataServiceTest {
         assertThat(row.areaCongestMsg()).startsWith("사람이 몰려있을 가능성이 낮고");
         assertThat(row.areaPpltnMin()).isEqualTo(18000);
         assertThat(row.areaPpltnMax()).isEqualTo(20000);
-        // 기준 시각은 "yyyy-MM-dd HH:mm" KST로 내려온다 (ISO 형식이 아니다)
-        assertThat(row.ppltnTime()).isEqualTo(LocalDateTime.of(2026, 9, 7, 20, 35));
+        // 기준 시각은 "yyyy-MM-dd HH:mm" KST로 내려오고(ISO 형식이 아니다), UTC로 바꿔 담는다
+        // 픽스처의 2026-09-07 20:35 KST = 11:35 UTC
+        assertThat(row.ppltnTime()).isEqualTo(LocalDateTime.of(2026, 9, 7, 11, 35));
     }
 
     @Test
@@ -73,15 +74,15 @@ class SeoulPublicDataServiceTest {
         assertThat(row.fcstPpltn()).hasSize(12);
 
         SeoulCityDataResponse.Forecast first = row.fcstPpltn().get(0);
-        // 기준 시각(11:15)이 아니라 다음 정시부터 시작한다
-        assertThat(first.fcstTime()).isEqualTo(LocalDateTime.of(2026, 10, 10, 12, 0));
+        // 기준 시각(11:15 KST)이 아니라 다음 정시부터 시작한다. 12:00 KST = 03:00 UTC
+        assertThat(first.fcstTime()).isEqualTo(LocalDateTime.of(2026, 10, 10, 3, 0));
         assertThat(first.fcstCongestLvl()).isEqualTo("약간 붐빔");
         assertThat(first.fcstPpltnMin()).isEqualTo(28000);
         assertThat(first.fcstPpltnMax()).isEqualTo(30000);
 
-        // 1시간 간격이라 마지막 항목이 기준 시각으로부터 12시간 뒤를 덮는다
+        // 1시간 간격이라 마지막 항목이 기준 시각으로부터 12시간 뒤를 덮는다 (23:00 KST = 14:00 UTC)
         assertThat(row.fcstPpltn().get(11).fcstTime())
-                .isEqualTo(LocalDateTime.of(2026, 10, 10, 23, 0));
+                .isEqualTo(LocalDateTime.of(2026, 10, 10, 14, 0));
     }
 
     @Test

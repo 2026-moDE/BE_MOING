@@ -1,0 +1,71 @@
+{
+  "pageRange": [
+    1
+  ],
+  "total": 7,
+  "row": [
+    {
+      "area_nm": "강남 MICE 관광특구",
+      "congestion_color": "#FFB100",
+      "x": "37.51100010501905",
+      "y": "127.06006319403016",
+      "area_congest_lvl": "보통",
+      "category": "관광특구",
+      "area_congest_num": 2
+    },
+    {
+      "area_nm": "동대문 관광특구",
+      "congestion_color": "#FFB100",
+      "x": "37.56731090568166",
+      "y": "127.01102251856014",
+      "area_congest_lvl": "보통",
+      "category": "관광특구",
+      "area_congest_num": 2
+    },
+    {
+      "area_nm": "명동 관광특구",
+      "congestion_color": "#FFB100",
+      "x": "37.56414944914326",
+      "y": "126.9818508974474",
+      "area_congest_lvl": "보통",
+      "category": "관광특구",
+      "area_congest_num": 2
+    },
+    {
+      "area_nm": "이태원 관광특구",
+      "congestion_color": "#00D369",
+      "x": "37.53443791780294",
+      "y": "126.99437268919876",
+      "area_congest_lvl": "여유",
+      "category": "관광특구",
+      "area_congest_num": 1
+    },
+    {
+      "area_nm": "잠실 관광특구",
+      "congestion_color": "#00D369",
+      "x": "37.516479449642375",
+      "y": "127.11527419790497",
+      "area_congest_lvl": "여유",
+      "category": "관광특구",
+      "area_congest_num": 1
+    },
+    {
+      "area_nm": "종로·청계 관광특구",
+      "congestion_color": "#FFB100",
+      "x": "37.57000153681658",
+      "y": "126.99736970161165",
+      "area_congest_lvl": "보통",
+      "category": "관광특구",
+      "area_congest_num": 2
+    },
+    {
+      "area_nm": "홍대 관광특구",
+      "congestion_color": "#00D369",
+      "x": "37.55391867558625",
+      "y": "126.92127401787192",
+      "area_congest_lvl": "여유",
+      "category": "관광특구",
+      "area_congest_num": 1
+    }
+  ]
+}

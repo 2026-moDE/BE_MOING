@@ -18,6 +18,8 @@ import com.moing.backend.domain.admin.service.AdminReportService;
 import com.moing.backend.domain.admin.service.AdminReviewService;
 import com.moing.backend.domain.admin.service.AdminStatsService;
 import com.moing.backend.domain.admin.service.AdminUserService;
+import com.moing.backend.domain.congestion.dto.SeoulAreaSyncResponse;
+import com.moing.backend.domain.congestion.service.SeoulAreaSyncService;
 import com.moing.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -50,6 +52,7 @@ public class AdminController {
     private final AdminReportService adminReportService;
     private final AdminReviewService adminReviewService;
     private final AdminUserService adminUserService;
+    private final SeoulAreaSyncService seoulAreaSyncService;
 
     @Operation(summary = "관리자 로그인", description = "이메일과 비밀번호로 관리자 로그인 후 JWT 토큰을 발급합니다.")
     @ApiResponses({
@@ -152,5 +155,18 @@ public class AdminController {
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
         return ResponseEntity.ok(ApiResponse.success("success",
                 adminUserService.getUsers(cursor, limit)));
+    }
+
+    @Operation(summary = "서울시 지역 목록 동기화",
+            description = "서울시 실시간 도시데이터 지역 목록(약 121곳)을 받아 좌표와 함께 저장합니다. "
+                    + "지역 혼잡도 조회가 이 목록에서 최근접 지역을 찾으므로 최초 1회 실행이 필요하고, "
+                    + "이후에는 주 1회 스케줄러가 자동으로 맞춥니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "동기화 완료"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "서울시 지역 목록 조회 실패")
+    })
+    @PostMapping("/seoul-areas/sync")
+    public ResponseEntity<ApiResponse<SeoulAreaSyncResponse>> syncSeoulAreas() {
+        return ResponseEntity.ok(ApiResponse.success("동기화 완료", seoulAreaSyncService.sync()));
     }
 }

@@ -1,5 +1,6 @@
 package com.moing.backend.domain.place.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.review.entity.CongestionLevel;
@@ -27,6 +28,7 @@ public record HotPlaceResponse(List<PlaceItem> places) {
 
     public record LatestReview(
             String comment,
+            @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
             @JsonProperty("created_at") LocalDateTime createdAt
     ) {}
 }

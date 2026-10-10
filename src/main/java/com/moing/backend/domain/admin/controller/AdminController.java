@@ -159,8 +159,8 @@ public class AdminController {
 
     @Operation(summary = "서울시 지역 목록 동기화",
             description = "서울시 실시간 도시데이터 지역 목록(약 121곳)을 받아 좌표와 함께 저장합니다. "
-                    + "지역 혼잡도 조회가 이 목록에서 최근접 지역을 찾으므로 최초 1회 실행이 필요하고, "
-                    + "이후에는 주 1회 스케줄러가 자동으로 맞춥니다.")
+                    + "서버 기동 시와 주 1회 자동으로 동기화되므로 평소에는 호출할 필요가 없고, "
+                    + "서울시 장애로 자동 동기화가 실패했을 때 수동으로 다시 받기 위한 API입니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "동기화 완료"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "서울시 지역 목록 조회 실패")

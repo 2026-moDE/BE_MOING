@@ -33,8 +33,8 @@ public class ExploreService {
     private static final int RECENT_HOURS = 72;
 
     private static final int DEFAULT_RADIUS = 2000;
+    // 상한은 두지 않는다 (클라이언트가 화면 배율에 맞춰 반경을 넓게 잡는 경우가 있다)
     private static final int MIN_RADIUS = 100;
-    private static final int MAX_RADIUS = 5000;
 
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 50;
@@ -59,7 +59,7 @@ public class ExploreService {
         }
 
         int safeRadius = radius != null ? radius : DEFAULT_RADIUS;
-        if (safeRadius < MIN_RADIUS || safeRadius > MAX_RADIUS) {
+        if (safeRadius < MIN_RADIUS) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 

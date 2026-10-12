@@ -50,6 +50,9 @@ class MagazineBatchServiceTest {
     private static final ZoneId UTC = ZoneId.of("UTC");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 13, 4, 0);
 
+    /** 기간 제한 없는 규칙이 넘기는 값 */
+    private static final LocalDateTime NO_TIME_LIMIT = LocalDateTime.of(1970, 1, 1, 0, 0);
+
     private ReviewRepository reviewRepository;
     private MagazineRepository magazineRepository;
     private MagazineItemRepository magazineItemRepository;
@@ -174,7 +177,7 @@ class MagazineBatchServiceTest {
 
         verify(reviewRepository).findMagazineCandidates(
                 eq(List.of(CongestionLevel.RELAXED)), eq(List.of(PlaceCategory.CAFE)),
-                eq(null), any(Pageable.class));
+                eq(NO_TIME_LIMIT), any(Pageable.class));
     }
 
     @Test
@@ -184,7 +187,7 @@ class MagazineBatchServiceTest {
 
         verify(reviewRepository).findMagazineCandidates(
                 eq(MagazineRule.ANY_LEVEL), eq(MagazineRule.INDOOR_CATEGORIES),
-                eq(null), any(Pageable.class));
+                eq(NO_TIME_LIMIT), any(Pageable.class));
         assertThat(MagazineRule.INDOOR_CATEGORIES).doesNotContain(PlaceCategory.ETC);
     }
 
@@ -205,7 +208,7 @@ class MagazineBatchServiceTest {
 
         verify(reviewRepository).findMagazineCandidates(
                 eq(List.of(CongestionLevel.VERY_CROWDED)), eq(List.of(PlaceCategory.values())),
-                eq(null), any(Pageable.class));
+                eq(NO_TIME_LIMIT), any(Pageable.class));
     }
 
     @Test

@@ -57,6 +57,14 @@ public class MagazineBatchService {
     /** TODAY 규칙의 기준 */
     private static final int TODAY_HOURS = 24;
 
+    /**
+     * 기간 제한이 없는 규칙이 넘기는 시각.
+     *
+     * <p>null을 넘겨 쿼리에서 걸러내면 PostgreSQL이 파라미터 타입을 추론하지 못해 쿼리가
+     * 거부된다. 서비스가 생기기 한참 전 시각을 넘겨 사실상 제한이 없게 둔다.
+     */
+    private static final LocalDateTime NO_TIME_LIMIT = LocalDateTime.of(1970, 1, 1, 0, 0);
+
     /** LATE_NIGHT 규칙의 기준 — KST 이 시각 이후에 작성된 리뷰 */
     private static final int LATE_NIGHT_FROM_HOUR = 22;
 
@@ -137,13 +145,13 @@ public class MagazineBatchService {
 
         return switch (rule) {
             case RELAXED_CAFE -> reviewRepository.findMagazineCandidates(
-                    List.of(CongestionLevel.RELAXED), List.of(PlaceCategory.CAFE), null, limit);
+                    List.of(CongestionLevel.RELAXED), List.of(PlaceCategory.CAFE), NO_TIME_LIMIT, limit);
 
             case RAINY_INDOOR -> reviewRepository.findMagazineCandidates(
-                    MagazineRule.ANY_LEVEL, MagazineRule.INDOOR_CATEGORIES, null, limit);
+                    MagazineRule.ANY_LEVEL, MagazineRule.INDOOR_CATEGORIES, NO_TIME_LIMIT, limit);
 
             case CROWDED -> reviewRepository.findMagazineCandidates(
-                    List.of(CongestionLevel.VERY_CROWDED), allCategories(), null, limit);
+                    List.of(CongestionLevel.VERY_CROWDED), allCategories(), NO_TIME_LIMIT, limit);
 
             case TODAY -> reviewRepository.findMagazineCandidates(
                     MagazineRule.ANY_LEVEL, allCategories(),

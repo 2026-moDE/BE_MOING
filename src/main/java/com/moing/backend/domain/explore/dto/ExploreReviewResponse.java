@@ -18,8 +18,12 @@ import java.util.List;
 public record ExploreReviewResponse(
         String seed,
         Center center,
-        long total,
-        // 마지막 페이지면 null
+        /**
+         * 다음 페이지의 offset. 마지막 페이지면 null.
+         *
+         * <p>전체 개수(total)는 내려주지 않는다. 세려면 반경 조회를 한 번 더 돌려야 하는데
+         * 그리드가 쓰지 않는 값이다. 다음 페이지가 있는지는 한 건 더 받아보고 판단한다.
+         */
         @JsonProperty("next_offset") Integer nextOffset,
         List<ReviewItem> reviews
 ) {

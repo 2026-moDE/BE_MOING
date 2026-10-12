@@ -126,8 +126,80 @@ class SeoulPublicDataServiceTest {
         assertThat(seoulPublicDataService.fetchPopulation(AREA_NAME)).isNull();
     }
 
+    @Test
+    @DisplayName("실제 응답 형식을 그대로 파싱해 날씨를 꺼낸다")
+    void 날씨_응답을_파싱한다() throws IOException {
+        mockServer.expect(requestTo(expectedWeatherUri(AREA_NAME)))
+                .andRespond(withSuccess(fixture("seoul-citydata-weather.json"), MediaType.APPLICATION_JSON));
+
+        SeoulWeatherResponse.Weather weather = seoulPublicDataService.fetchWeather(AREA_NAME);
+
+        assertThat(weather).isNotNull();
+        assertThat(weather.temp()).isEqualTo("14.7");
+        assertThat(weather.maxTemp()).isEqualTo("23.0");
+        assertThat(weather.minTemp()).isEqualTo("11.0");
+        assertThat(weather.humidity()).isEqualTo("44");
+        // 비·눈이 없으면 숫자가 아니라 "-"로 온다. 숫자로 받으면 응답 전체가 깨진다
+        assertThat(weather.precipitation()).isEqualTo("-");
+        assertThat(weather.precptType()).isEqualTo("없음");
+        assertThat(weather.pcpMsg()).isEqualTo("비 또는 눈 소식이 없어요.");
+        assertThat(weather.pm10()).isEqualTo("30");
+        assertThat(weather.pm10Index()).isEqualTo("좋음");
+        assertThat(weather.pm25()).isEqualTo("13");
+        assertThat(weather.airIdx()).isEqualTo("좋음");
+        assertThat(weather.uvIndex()).isEqualTo("0");
+        assertThat(weather.uvIndexLvl()).isEqualTo("낮음");
+        // 일출·일몰은 날짜가 없어 KST 그대로 둔다
+        assertThat(weather.sunrise()).isEqualTo("06:28");
+        assertThat(weather.sunset()).isEqualTo("18:14");
+        // 픽스처의 2026-10-03 00:00 KST = 2026-10-02 15:00 UTC
+        assertThat(weather.weatherTime()).isEqualTo(LocalDateTime.of(2026, 10, 2, 15, 0));
+    }
+
+    @Test
+    @DisplayName("다음 정시 예보에서 하늘 상태와 강수 확률을 꺼낸다")
+    void 다음_정시_예보를_꺼낸다() throws IOException {
+        mockServer.expect(requestTo(expectedWeatherUri(AREA_NAME)))
+                .andRespond(withSuccess(fixture("seoul-citydata-weather.json"), MediaType.APPLICATION_JSON));
+
+        SeoulWeatherResponse.HourlyForecast nextHour =
+                seoulPublicDataService.fetchWeather(AREA_NAME).nextHour();
+
+        assertThat(nextHour).isNotNull();
+        assertThat(nextHour.skyStts()).isEqualTo("맑음");
+        assertThat(nextHour.rainChance()).isEqualTo("0");
+        // 예보 시각만 "yyyyMMddHHmm"로 온다. 202610030100 KST = 2026-10-02 16:00 UTC
+        assertThat(nextHour.fcstDt()).isEqualTo(LocalDateTime.of(2026, 10, 2, 16, 0));
+    }
+
+    @Test
+    @DisplayName("날씨 구역이 비어 있는 지역은 null을 반환한다")
+    void 날씨_구역이_없으면_null이다() {
+        // 가산디지털단지역·서울대공원은 조회가 성공해도 WEATHER_STTS가 비어 온다
+        mockServer.expect(requestTo(expectedWeatherUri(AREA_NAME)))
+                .andRespond(withSuccess(
+                        "{\"CITYDATA\":{\"AREA_NM\":\"가산디지털단지역\",\"WEATHER_STTS\":null}}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(seoulPublicDataService.fetchWeather(AREA_NAME)).isNull();
+    }
+
+    @Test
+    @DisplayName("날씨 조회가 실패해도 예외를 던지지 않고 null을 반환한다")
+    void 날씨_호출_실패시_null이다() {
+        mockServer.expect(requestTo(expectedWeatherUri(AREA_NAME)))
+                .andRespond(withServerError());
+
+        assertThat(seoulPublicDataService.fetchWeather(AREA_NAME)).isNull();
+    }
+
     private String expectedUri(String areaName) {
         return "http://openapi.seoul.go.kr:8088/" + API_KEY + "/json/citydata_ppltn/1/5/"
+                + URLEncoder.encode(areaName, StandardCharsets.UTF_8);
+    }
+
+    private String expectedWeatherUri(String areaName) {
+        return "http://openapi.seoul.go.kr:8088/" + API_KEY + "/json/citydata/1/5/"
                 + URLEncoder.encode(areaName, StandardCharsets.UTF_8);
     }
 

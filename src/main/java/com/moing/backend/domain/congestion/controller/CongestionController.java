@@ -1,6 +1,7 @@
 package com.moing.backend.domain.congestion.controller;
 
 import com.moing.backend.domain.congestion.dto.CongestionResponse;
+import com.moing.backend.domain.congestion.dto.SeoulAreaSearchResponse;
 import com.moing.backend.domain.congestion.service.CongestionService;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -32,5 +33,16 @@ public class CongestionController {
         }
         return ResponseEntity.ok(ApiResponse.success("success",
                 congestionService.getNearbyCongestion(latitude, longitude)));
+    }
+
+    // 지역 검색 (사용자가 혼잡도를 볼 지역을 직접 고르는 화면용)
+    // keyword 없으면 선택 가능한 전체 지역을 가나다순으로 내려준다
+    @GetMapping("/areas")
+    public ResponseEntity<ApiResponse<SeoulAreaSearchResponse>> searchAreas(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) String keyword
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                congestionService.searchAreas(keyword)));
     }
 }

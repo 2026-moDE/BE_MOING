@@ -11,8 +11,17 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * 리뷰 엔티티.
+ *
+ * <p>좌표 인덱스는 탐색 탭의 반경 조회가 쓴다. 하버사인 식은 인덱스를 탈 수 없어
+ * 쿼리가 먼저 좌표 범위(바운딩 박스)로 후보를 좁히는데, 그 범위 조건이 이 인덱스를 탄다.
+ * 인덱스가 없으면 전체 리뷰에 삼각함수가 돌아간다.
+ */
 @Entity
-@Table(name = "reviews")
+@Table(name = "reviews", indexes = {
+        @Index(name = "idx_reviews_latitude_longitude", columnList = "latitude, longitude")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

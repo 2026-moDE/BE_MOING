@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,9 +28,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ExploreService {
 
-    // 다른 화면의 "현재 리뷰"와 같은 기준
-    private static final int RECENT_HOURS = 72;
-
+    // 기간 제한을 두지 않는다. 다른 화면은 72h 이내를 "현재 리뷰"로 끊지만,
+    // 탐색은 이 동네에 쌓인 기록을 훑는 화면이라 지난 리뷰도 함께 보여준다.
     private static final int DEFAULT_RADIUS = 2000;
     // 상한은 두지 않는다 (클라이언트가 화면 배율에 맞춰 반경을 넓게 잡는 경우가 있다)
     private static final int MIN_RADIUS = 100;
@@ -46,7 +44,7 @@ public class ExploreService {
     private final UserRepository userRepository;
 
     /**
-     * 기준 좌표 반경 내 실시간 리뷰 사진 그리드.
+     * 기준 좌표 반경(기본 2km) 내 리뷰 사진 그리드. 기간 제한 없이 쌓인 리뷰 전체를 본다.
      *
      * <p>순서는 seed로 고정된 랜덤이다. seed가 없으면 새로 만들어 응답에 담는다.
      * 정렬 키가 해시라 id 커서를 쓸 수 없어 offset으로 넘긴다.
@@ -79,19 +77,21 @@ public class ExploreService {
                 ? seed
                 : UUID.randomUUID().toString().substring(0, SEED_LENGTH);
 
-        LocalDateTime since = LocalDateTime.now().minusHours(RECENT_HOURS);
-
-        long total = reviewRepository.countExploreReviews(
-                latitude, longitude, safeRadius, since, userId);
-
+        // 한 건 더 받아 다음 페이지가 있는지 본다. 전체 개수를 세려면 같은 반경 조회를
+        // 한 번 더 돌려야 하는데, 그리드가 total을 쓰지 않아 그 비용을 낼 이유가 없다
         List<Object[]> rows = reviewRepository.findExploreReviewIds(
-                latitude, longitude, safeRadius, since, userId, safeSeed, safeLimit, safeOffset);
+                latitude, longitude, safeRadius, userId, safeSeed, safeLimit + 1, safeOffset);
+
+        boolean hasNext = rows.size() > safeLimit;
+        if (hasNext) {
+            rows = rows.subList(0, safeLimit);
+        }
 
         ExploreReviewResponse.Center center =
                 new ExploreReviewResponse.Center(latitude, longitude, safeRadius);
 
         if (rows.isEmpty()) {
-            return new ExploreReviewResponse(safeSeed, center, total, null, List.of());
+            return new ExploreReviewResponse(safeSeed, center, null, List.of());
         }
 
         // 해시 순서는 쿼리가 정했으므로 거리와 순서를 그대로 들고 간다
@@ -137,9 +137,10 @@ public class ExploreService {
                     placeInfo, userInfo, r.getCreatedAt());
         }).toList();
 
-        int consumed = safeOffset + items.size();
-        Integer nextOffset = consumed < total ? consumed : null;
+        // 쿼리가 실제로 소비한 행 수로 센다. 조회 사이에 지워진 리뷰가 있어 items가 더 짧을 수
+        // 있는데, items 기준으로 넘기면 그 자리를 다음 페이지가 다시 읽어 같은 사진이 또 나온다
+        Integer nextOffset = hasNext ? safeOffset + rows.size() : null;
 
-        return new ExploreReviewResponse(safeSeed, center, total, nextOffset, items);
+        return new ExploreReviewResponse(safeSeed, center, nextOffset, items);
     }
 }

@@ -8,6 +8,7 @@ import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import com.moing.backend.global.infra.SeoulCityDataResponse;
 import com.moing.backend.global.infra.SeoulPublicDataService;
+import com.moing.backend.global.infra.SeoulWeatherResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -140,8 +141,97 @@ class CongestionServiceTest {
                 .isEqualTo(ErrorCode.EXTERNAL_API_ERROR);
     }
 
+    @Test
+    @DisplayName("날씨를 함께 내려주고 문자열 값을 숫자로 바꿔 담는다")
+    void 날씨를_함께_내려준다() {
+        givenRow(row("여유", List.of()));
+        givenWeather(weather());
+
+        CongestionResponse.Weather weather = nearby().weather();
+
+        assertThat(weather).isNotNull();
+        assertThat(weather.temperature()).isEqualTo(14.7);
+        assertThat(weather.maxTemperature()).isEqualTo(23.0);
+        assertThat(weather.humidity()).isEqualTo(44);
+        assertThat(weather.pm10()).isEqualTo(30);
+        assertThat(weather.pm10Index()).isEqualTo("좋음");
+        assertThat(weather.uvIndex()).isZero();
+        assertThat(weather.precipitationMessage()).isEqualTo("비 또는 눈 소식이 없어요.");
+        assertThat(weather.sunrise()).isEqualTo("06:28");
+        // 날씨 기준 시각도 KST로 받아 UTC로 바꿔 담는다
+        assertThat(weather.updatedAt()).isEqualTo(EXPECTED_UTC);
+    }
+
+    @Test
+    @DisplayName("강수량이 없을 때 쓰는 \"-\"는 null로 바꿔 담는다")
+    void 강수량_없음은_null이다() {
+        givenRow(row("여유", List.of()));
+        givenWeather(weather());
+
+        // 0.0으로 담으면 "강수량 0mm"와 "측정값 없음"을 클라이언트가 구분할 수 없다
+        assertThat(nearby().weather().precipitation()).isNull();
+    }
+
+    @Test
+    @DisplayName("하늘 상태와 강수 확률은 다음 정시 예보에서 가져온다")
+    void 하늘_상태는_다음_정시_예보다() {
+        givenRow(row("여유", List.of()));
+        givenWeather(weather());
+
+        CongestionResponse.Weather weather = nearby().weather();
+
+        // 서울시는 현재 하늘 상태를 주지 않는다
+        assertThat(weather.skyStatus()).isEqualTo("맑음");
+        assertThat(weather.rainChance()).isZero();
+    }
+
+    @Test
+    @DisplayName("날씨가 없어도 혼잡도는 그대로 내려준다")
+    void 날씨가_없어도_혼잡도는_내려준다() {
+        givenRow(row("붐빔", List.of()));
+        givenWeather(null);
+
+        CongestionResponse response = nearby();
+
+        // 날씨는 부가 정보라 502로 끊지 않는다
+        assertThat(response.weather()).isNull();
+        assertThat(response.congestionLevel()).isEqualTo(CongestionLevel.VERY_CROWDED);
+        assertThat(response.areaName()).isEqualTo(AREA_NAME);
+    }
+
+    @Test
+    @DisplayName("예보 구역이 비어 있으면 하늘 상태만 비운다")
+    void 예보가_없으면_하늘_상태만_비운다() {
+        givenRow(row("여유", List.of()));
+        givenWeather(new SeoulWeatherResponse.Weather(
+                SEOUL_TIME_KST, "14.7", "23.0", "11.0", "44", "-", "없음", "비 또는 눈 소식이 없어요.",
+                "06:28", "18:14", "낮음", "0", "자외선 메시지",
+                "좋음", "13", "좋음", "30", "좋음", "대기질 메시지", null));
+
+        CongestionResponse.Weather weather = nearby().weather();
+
+        assertThat(weather.skyStatus()).isNull();
+        assertThat(weather.rainChance()).isNull();
+        assertThat(weather.temperature()).isEqualTo(14.7);
+    }
+
     private CongestionResponse nearby() {
         return congestionService.getNearbyCongestion(LATITUDE, LONGITUDE);
+    }
+
+    private void givenWeather(SeoulWeatherResponse.Weather weather) {
+        when(seoulPublicDataService.fetchWeather(anyString())).thenReturn(weather);
+    }
+
+    /** 실제 응답과 같은 모양 — 값은 전부 문자열이고 없는 값은 "-"다 */
+    private SeoulWeatherResponse.Weather weather() {
+        return new SeoulWeatherResponse.Weather(
+                SEOUL_TIME_KST, "14.7", "23.0", "11.0", "44", "-", "없음", "비 또는 눈 소식이 없어요.",
+                "06:28", "18:14", "낮음", "0", "자외선 메시지",
+                "좋음", "13", "좋음", "30", "좋음", "대기질 메시지",
+                new SeoulWeatherResponse.ForecastWrapper(List.of(
+                        new SeoulWeatherResponse.HourlyForecast(
+                                FORECAST_START_KST, "16", "없음", "0", "맑음"))));
     }
 
     private void givenRow(SeoulCityDataResponse.Row row) {

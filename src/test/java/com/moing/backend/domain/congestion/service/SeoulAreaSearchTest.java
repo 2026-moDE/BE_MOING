@@ -1,8 +1,13 @@
 package com.moing.backend.domain.congestion.service;
 
+import com.moing.backend.domain.congestion.dto.CongestionResponse;
 import com.moing.backend.domain.congestion.dto.SeoulAreaSearchResponse;
 import com.moing.backend.domain.congestion.entity.SeoulArea;
 import com.moing.backend.domain.congestion.repository.SeoulAreaRepository;
+import com.moing.backend.domain.review.entity.CongestionLevel;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
+import com.moing.backend.global.infra.SeoulCityDataResponse;
 import com.moing.backend.global.infra.SeoulPublicDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,11 +15,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -104,6 +115,37 @@ class SeoulAreaSearchTest {
         congestionService.searchAreas("강남");
 
         verify(seoulPublicDataService, never()).fetchPopulation(anyString());
+    }
+
+    @Test
+    @DisplayName("고른 지역은 좌표가 아니라 id로 조회한다")
+    void 고른_지역을_id로_조회한다() {
+        when(seoulAreaRepository.findById(7L))
+                .thenReturn(Optional.of(area("동대문 관광특구", "관광특구")));
+        when(seoulPublicDataService.fetchPopulation("동대문 관광특구"))
+                .thenReturn(new SeoulCityDataResponse.Row(
+                        "동대문 관광특구", "POI003", "붐빔", "사람이 많아 붐벼요.",
+                        16000, 18000, SYNCED_AT, "N", null));
+
+        CongestionResponse response = congestionService.getAreaCongestion(7L);
+
+        // 74m 옆 DDP가 아니라 고른 지역이 그대로 나와야 한다
+        assertThat(response.areaName()).isEqualTo("동대문 관광특구");
+        assertThat(response.congestionLevel()).isEqualTo(CongestionLevel.VERY_CROWDED);
+        // 좌표로 최근접을 다시 찾지 않는다
+        verify(seoulAreaRepository, never())
+                .findNearest(anyDouble(), anyDouble(), anyInt(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("없는 지역 id는 404로 끊는다")
+    void 없는_지역은_404다() {
+        when(seoulAreaRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> congestionService.getAreaCongestion(999L))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.AREA_NOT_FOUND);
     }
 
     private SeoulArea area(String areaNm, String category) {

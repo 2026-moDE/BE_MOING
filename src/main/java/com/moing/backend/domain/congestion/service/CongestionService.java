@@ -48,8 +48,25 @@ public class CongestionService {
      * @throws CustomException 반경 내 지역이 없으면 404, 서울시 인구 응답이 없으면 502
      */
     public CongestionResponse getNearbyCongestion(double latitude, double longitude) {
-        SeoulArea area = findNearestArea(latitude, longitude);
+        return getCongestion(findNearestArea(latitude, longitude));
+    }
 
+    /**
+     * 사용자가 직접 고른 지역의 실시간 혼잡도·12시간 예측·날씨를 조회한다.
+     *
+     * <p>좌표가 아니라 id로 받는다. 지역 121곳 중 314쌍이 서로 2km 안에 있고 가장 가까운
+     * 쌍은 74m밖에 안 떨어져 있어(동대문 관광특구 ↔ DDP), 좌표를 넘겨 최근접으로 다시
+     * 찾게 하면 고른 지역이 아닌 옆 지역이 잡힐 수 있다. 고른 지역은 추론할 대상이 아니다.
+     *
+     * @throws CustomException 없는 지역이면 404, 서울시 인구 응답이 없으면 502
+     */
+    public CongestionResponse getAreaCongestion(Long areaId) {
+        SeoulArea area = seoulAreaRepository.findById(areaId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AREA_NOT_FOUND));
+        return getCongestion(area);
+    }
+
+    private CongestionResponse getCongestion(SeoulArea area) {
         SeoulCityDataResponse.Row row = seoulPublicDataService.fetchPopulation(area.getAreaNm());
         if (row == null) {
             throw new CustomException(ErrorCode.EXTERNAL_API_ERROR);

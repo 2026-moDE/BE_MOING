@@ -10,6 +10,7 @@ import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
 import com.moing.backend.global.infra.SeoulCityDataResponse;
 import com.moing.backend.global.infra.SeoulPublicDataService;
+import com.moing.backend.global.infra.SeoulWeatherResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -39,9 +40,12 @@ public class CongestionService {
     private final SeoulPublicDataService seoulPublicDataService;
 
     /**
-     * 좌표에서 가장 가까운 서울시 도시데이터 지역의 실시간 혼잡도와 12시간 예측을 조회한다.
+     * 좌표에서 가장 가까운 서울시 도시데이터 지역의 실시간 혼잡도·12시간 예측·날씨를 조회한다.
      *
-     * @throws CustomException 반경 내 지역이 없으면 404, 서울시 응답이 없으면 502
+     * <p>날씨는 혼잡도의 부가 정보다. 서울시 날씨 응답이 비거나 실패하면 그 필드만 null로
+     * 두고 혼잡도는 그대로 내려준다 — 날씨 때문에 바텀시트 전체가 못 뜨면 손해가 더 크다.
+     *
+     * @throws CustomException 반경 내 지역이 없으면 404, 서울시 인구 응답이 없으면 502
      */
     public CongestionResponse getNearbyCongestion(double latitude, double longitude) {
         SeoulArea area = findNearestArea(latitude, longitude);
@@ -58,7 +62,57 @@ public class CongestionService {
                 row.areaPpltnMin(),
                 row.areaPpltnMax(),
                 row.ppltnTime(),
-                toForecast(row.fcstPpltn()));
+                toForecast(row.fcstPpltn()),
+                toWeather(seoulPublicDataService.fetchWeather(area.getAreaNm())));
+    }
+
+    /**
+     * 서울시 날씨 구역을 응답 DTO로 옮긴다.
+     *
+     * <p>모든 값이 문자열로 오고 값이 없으면 {@code "-"}가 들어오므로 전부 숫자 변환을 거친다.
+     * 하늘 상태·강수 확률은 현재값이 없어 다음 정시 예보에서 가져온다.
+     */
+    private CongestionResponse.Weather toWeather(SeoulWeatherResponse.Weather weather) {
+        if (weather == null) return null;
+
+        SeoulWeatherResponse.HourlyForecast nextHour = weather.nextHour();
+
+        return new CongestionResponse.Weather(
+                toDouble(weather.temp()),
+                toDouble(weather.maxTemp()),
+                toDouble(weather.minTemp()),
+                toInt(weather.humidity()),
+                toDouble(weather.precipitation()),
+                weather.precptType(),
+                weather.pcpMsg(),
+                nextHour != null ? nextHour.skyStts() : null,
+                nextHour != null ? toInt(nextHour.rainChance()) : null,
+                toInt(weather.pm10()),
+                weather.pm10Index(),
+                toInt(weather.pm25()),
+                weather.pm25Index(),
+                weather.airIdx(),
+                weather.airMsg(),
+                toInt(weather.uvIndex()),
+                weather.uvIndexLvl(),
+                weather.uvMsg(),
+                weather.sunrise(),
+                weather.sunset(),
+                weather.weatherTime());
+    }
+
+    /** 서울시는 값이 없을 때 "-"를 쓴다. 그 밖의 비숫자도 같이 걸러 null로 둔다 */
+    private Double toDouble(String value) {
+        try {
+            return value == null ? null : Double.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer toInt(String value) {
+        Double parsed = toDouble(value);
+        return parsed == null ? null : (int) Math.round(parsed);
     }
 
     /**

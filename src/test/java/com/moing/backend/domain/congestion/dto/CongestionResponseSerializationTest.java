@@ -60,16 +60,36 @@ class CongestionResponseSerializationTest {
 
         assertThat(objectMapper.readTree(json).fieldNames()).toIterable()
                 .containsExactly("area_name", "congestion_level", "congestion_message",
-                        "population_min", "population_max", "updated_at", "forecast");
+                        "population_min", "population_max", "updated_at", "forecast", "weather");
         assertThat(objectMapper.readTree(json).get("forecast").get(0).fieldNames()).toIterable()
                 .containsExactly("time", "congestion_level", "population_min", "population_max");
+    }
+
+    @Test
+    @DisplayName("날씨 필드도 snake_case로 직렬화하고 기준 시각은 ...Z 형식이다")
+    void 날씨를_직렬화한다() throws Exception {
+        var weather = objectMapper.readTree(objectMapper.writeValueAsString(response())).get("weather");
+
+        assertThat(weather.get("temperature").asDouble()).isEqualTo(14.7);
+        assertThat(weather.get("max_temperature").asDouble()).isEqualTo(23.0);
+        assertThat(weather.get("sky_status").asText()).isEqualTo("맑음");
+        assertThat(weather.get("pm10_index").asText()).isEqualTo("좋음");
+        // 측정값이 없는 필드는 null로 내려간다
+        assertThat(weather.get("precipitation").isNull()).isTrue();
+        // 일출·일몰만 KST 벽시계다 (날짜가 없어 UTC로 옮길 수 없다)
+        assertThat(weather.get("sunrise").asText()).isEqualTo("06:28");
+        assertThat(weather.get("updated_at").asText()).isEqualTo("2026-10-10T02:15:00Z");
     }
 
     private CongestionResponse response() {
         return new CongestionResponse(
                 "성수카페거리", CongestionLevel.RELAXED, "여유로워요.", 24000, 26000, UPDATED_AT,
                 List.of(new CongestionResponse.ForecastItem(
-                        UPDATED_AT.plusMinutes(45), CongestionLevel.CROWDED, 28000, 30000)));
+                        UPDATED_AT.plusMinutes(45), CongestionLevel.CROWDED, 28000, 30000)),
+                new CongestionResponse.Weather(
+                        14.7, 23.0, 11.0, 44, null, "없음", "비 또는 눈 소식이 없어요.",
+                        "맑음", 0, 30, "좋음", 13, "좋음", "좋음", "대기질에 이상이 없어요.",
+                        0, "낮음", "자외선 차단제를 발라주세요.", "06:28", "18:14", UPDATED_AT));
     }
 
     private String timeValue(String json, String field) throws Exception {

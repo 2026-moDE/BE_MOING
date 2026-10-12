@@ -21,9 +21,15 @@ public class CacheConfig {
 
     public static final String SEOUL_CONGESTION = "seoulCongestion";
 
+    /**
+     * 날씨는 전체 도시데이터를 받아 와야 해서 응답이 지역당 100KB 내외다.
+     * 인구와 갱신 주기는 같지만 응답 크기가 달라 캐시를 따로 둔다.
+     */
+    public static final String SEOUL_WEATHER = "seoulWeather";
+
     @Bean
     public CaffeineCacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager(SEOUL_CONGESTION);
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager(SEOUL_CONGESTION, SEOUL_WEATHER);
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofMinutes(5))
                 .maximumSize(200));   // 지역 121곳 + 여유

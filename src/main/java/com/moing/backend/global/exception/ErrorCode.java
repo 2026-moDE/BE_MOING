@@ -55,6 +55,10 @@ public enum ErrorCode {
     AREA_NOT_FOUND(HttpStatus.NOT_FOUND, "주변에 서울시 실시간 도시데이터 지역이 없습니다"),
     EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "외부 API 응답에 실패했습니다"),
 
+    // --- 매거진 관련 ---
+    MAGAZINE_NOT_FOUND(HttpStatus.NOT_FOUND, "매거진을 찾을 수 없습니다"),
+    MAGAZINE_GENERATION_IN_PROGRESS(HttpStatus.CONFLICT, "매거진 생성이 이미 진행 중입니다"),
+
     // --- 관리자 관련 ---
     ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");
 

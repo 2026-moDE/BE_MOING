@@ -258,18 +258,39 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("visibilities") List<Visibility> visibilities);
 
     /**
-     * 탐색 탭: 좌표 반경 내 72h 이내 리뷰의 id와 거리(m).
+     * 탐색 탭: 좌표 반경 내 리뷰의 id와 거리(m).
      *
-     * <p>노출 조건은 {@link #findCurrentReviews}와 같지만 기준이 장소가 아니라 좌표 반경이다.
-     * 거리는 PlaceRepository의 반경 쿼리와 같은 하버사인 식을 쓴다. 좌표가 없는 옛 리뷰는
-     * 식이 NULL이 되어 자연히 빠진다.
+     * <p>노출 조건은 {@link #findCurrentReviews}와 같지만 두 가지가 다르다. 기준이 장소가
+     * 아니라 좌표 반경이고, <b>기간 제한이 없다</b> — 탐색은 "지금 여기"가 아니라 이 동네에
+     * 쌓인 기록을 훑는 화면이라 72h가 지난 리뷰도 그대로 노출한다. 거리는 PlaceRepository의
+     * 반경 쿼리와 같은 하버사인 식을 쓴다. 좌표가 없는 옛 리뷰는 식이 NULL이 되어 자연히
+     * 빠진다(지금은 리뷰 작성에 좌표가 필수라 검증 전에 쌓인 행만 해당된다).
      *
      * <p>정렬은 seed를 섞은 해시라 같은 seed면 순서가 재현된다. 매 요청마다 새로 섞으면
      * 2페이지가 1페이지의 "다음"이라는 보장이 없어 본 사진이 또 나오거나 끝까지 안 나오는
-     * 리뷰가 생긴다. 정렬 키가 해시여서 id 커서를 쓸 수 없으므로 offset으로 넘긴다
-     * (72h 이내로 한정되어 전체 규모가 작다).
+     * 리뷰가 생긴다.
      *
-     * <p>조건을 바꾸면 {@link #countExploreReviews}도 같이 고쳐야 total이 어긋나지 않는다.
+     * <p>정렬 키가 해시여서 id 커서를 쓸 수 없으므로 offset으로 넘긴다. seed가 세션마다
+     * 달라 해시에 인덱스를 걸 수 없어 커서로 바꿔도 후보 전체에 md5를 계산해야 하므로,
+     * 정렬 비용은 페이징 방식으로 줄지 않는다.
+     *
+     * <p>대신 하버사인 앞에 좌표 범위(바운딩 박스) 조건을 둔다. 하버사인 식 자체는 인덱스를
+     * 탈 수 없어 그것만 쓰면 전체 리뷰에 삼각함수가 돌아간다. 박스 조건은 컬럼 범위 비교라
+     * {@code idx_reviews_latitude_longitude}를 타므로, 비싼 계산이 박스 안의 소수 행에만 돈다.
+     *
+     * <p>박스는 원을 감싸는 정사각형이라 모서리에 반경 밖 행이 들어오지만, 하버사인 조건이
+     * 그대로 남아 걸러낸다 — 결과는 박스를 두기 전과 같다.
+     *
+     * <p>1도당 거리는 <b>하버사인이 쓰는 것과 같은 구</b>(반지름 6,371,000m)에서 가져온다:
+     * 위도 1도 = 2π·6371000/360 = 111,194.93m. 실제 지구 타원체 값(약 111,320m)을 쓰면
+     * 박스가 원보다 좁아져 정북·정남 경계의 리뷰가 하버사인에 닿기 전에 빠진다.
+     * 박스는 어디까지나 선필터라 넉넉한 건 괜찮고 모자란 건 버그이므로 0.1% 여유를 더 둔다.
+     * 경도 1도는 위도가 올라갈수록 좁아져 {@code cos(위도)}로 나눈다.
+     *
+     * <p><b>경계값을 numeric으로 캐스팅한 것을 빼지 말 것.</b> 좌표 컬럼이 numeric(10,7)이라
+     * double precision과 비교하면 PostgreSQL이 컬럼 쪽을 {@code (latitude)::double precision}으로
+     * 올려버리고, 그 순간 인덱스를 못 쓴다 — 조건만 늘고 여전히 전체 스캔이다.
+     * 실측(리뷰 105만 건, 박스 안 6.5만 건)에서 캐스팅 없으면 262ms, 있으면 60ms였다.
      */
     @Query(value = """
             SELECT r.id,
@@ -281,9 +302,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                      ))
                    )) AS distance
             FROM reviews r
-            WHERE r.created_at > :since
-              AND r.is_blinded = false
+            WHERE r.is_blinded = false
               AND r.image_url IS NOT NULL
+              AND r.latitude BETWEEN CAST(:lat - (CAST(:radius AS double precision) * 1.001 / 111194.93) AS numeric(10,7))
+                                 AND CAST(:lat + (CAST(:radius AS double precision) * 1.001 / 111194.93) AS numeric(10,7))
+              AND r.longitude BETWEEN CAST(:lng - (CAST(:radius AS double precision) * 1.001 / (111194.93 * cos(radians(:lat)))) AS numeric(10,7))
+                                  AND CAST(:lng + (CAST(:radius AS double precision) * 1.001 / (111194.93 * cos(radians(:lat)))) AS numeric(10,7))
               AND (r.visibility IS NULL
                    OR r.visibility <> 'FRIENDS'
                    OR r.user_id = :viewerId
@@ -305,40 +329,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radius") int radius,
-            @Param("since") LocalDateTime since,
             @Param("viewerId") Long viewerId,
             @Param("seed") String seed,
             @Param("limit") int limit,
             @Param("offset") int offset);
-
-    /** 탐색 탭 total. 조건은 {@link #findExploreReviewIds}와 반드시 같아야 한다 */
-    @Query(value = """
-            SELECT COUNT(*)
-            FROM reviews r
-            WHERE r.created_at > :since
-              AND r.is_blinded = false
-              AND r.image_url IS NOT NULL
-              AND (r.visibility IS NULL
-                   OR r.visibility <> 'FRIENDS'
-                   OR r.user_id = :viewerId
-                   OR EXISTS (SELECT 1 FROM follows f
-                              WHERE f.follower_id = :viewerId
-                                AND f.following_id = r.user_id
-                                AND f.status = 'ACCEPTED'))
-              AND (6371000 * acos(
-                    GREATEST(-1.0, LEAST(1.0,
-                      cos(radians(:lat)) * cos(radians(r.latitude))
-                      * cos(radians(r.longitude) - radians(:lng))
-                      + sin(radians(:lat)) * sin(radians(r.latitude))
-                    ))
-                  )) <= :radius
-            """, nativeQuery = true)
-    long countExploreReviews(
-            @Param("lat") double lat,
-            @Param("lng") double lng,
-            @Param("radius") int radius,
-            @Param("since") LocalDateTime since,
-            @Param("viewerId") Long viewerId);
 
     // 오늘 리뷰 수 (관리자 통계)
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);

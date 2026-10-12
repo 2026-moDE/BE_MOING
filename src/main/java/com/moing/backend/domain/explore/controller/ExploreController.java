@@ -19,7 +19,9 @@ public class ExploreController {
     private final ExploreService exploreService;
 
     /**
-     * 기준 장소 반경 내 실시간 리뷰 사진 그리드.
+     * 기준 좌표 반경(기본 2km) 내 리뷰 사진 그리드.
+     *
+     * <p>다른 화면과 달리 기간을 끊지 않는다. 탐색은 이 동네에 쌓인 기록을 훑는 화면이다.
      *
      * <p>장소 검색과 최근 검색어는 /api/search가 담당한다. 여기는 좌표를 받은 뒤의 조회만 한다.
      *

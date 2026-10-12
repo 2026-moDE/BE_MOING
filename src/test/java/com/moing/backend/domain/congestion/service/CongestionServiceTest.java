@@ -203,10 +203,7 @@ class CongestionServiceTest {
     @DisplayName("예보 구역이 비어 있으면 하늘 상태만 비운다")
     void 예보가_없으면_하늘_상태만_비운다() {
         givenRow(row("여유", List.of()));
-        givenWeather(new SeoulWeatherResponse.Weather(
-                SEOUL_TIME_KST, "14.7", "23.0", "11.0", "44", "-", "없음", "비 또는 눈 소식이 없어요.",
-                "06:28", "18:14", "낮음", "0", "자외선 메시지",
-                "좋음", "13", "좋음", "30", "좋음", "대기질 메시지", null));
+        givenWeather(weather(null));
 
         CongestionResponse.Weather weather = nearby().weather();
 
@@ -225,13 +222,15 @@ class CongestionServiceTest {
 
     /** 실제 응답과 같은 모양 — 값은 전부 문자열이고 없는 값은 "-"다 */
     private SeoulWeatherResponse.Weather weather() {
+        return weather(List.of(new SeoulWeatherResponse.HourlyForecast(
+                FORECAST_START_KST, "16", "없음", "0", "맑음")));
+    }
+
+    private SeoulWeatherResponse.Weather weather(List<SeoulWeatherResponse.HourlyForecast> forecast) {
         return new SeoulWeatherResponse.Weather(
                 SEOUL_TIME_KST, "14.7", "23.0", "11.0", "44", "-", "없음", "비 또는 눈 소식이 없어요.",
                 "06:28", "18:14", "낮음", "0", "자외선 메시지",
-                "좋음", "13", "좋음", "30", "좋음", "대기질 메시지",
-                new SeoulWeatherResponse.ForecastWrapper(List.of(
-                        new SeoulWeatherResponse.HourlyForecast(
-                                FORECAST_START_KST, "16", "없음", "0", "맑음"))));
+                "좋음", "13", "좋음", "30", "좋음", "대기질 메시지", forecast);
     }
 
     private void givenRow(SeoulCityDataResponse.Row row) {

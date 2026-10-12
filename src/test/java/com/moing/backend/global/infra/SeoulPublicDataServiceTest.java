@@ -135,25 +135,40 @@ class SeoulPublicDataServiceTest {
         SeoulWeatherResponse.Weather weather = seoulPublicDataService.fetchWeather(AREA_NAME);
 
         assertThat(weather).isNotNull();
-        assertThat(weather.temp()).isEqualTo("14.7");
-        assertThat(weather.maxTemp()).isEqualTo("23.0");
-        assertThat(weather.minTemp()).isEqualTo("11.0");
-        assertThat(weather.humidity()).isEqualTo("44");
+        assertThat(weather.temp()).isEqualTo("22.6");
+        assertThat(weather.maxTemp()).isEqualTo("22.0");
+        assertThat(weather.minTemp()).isEqualTo("17.0");
+        assertThat(weather.humidity()).isEqualTo("63");
         // 비·눈이 없으면 숫자가 아니라 "-"로 온다. 숫자로 받으면 응답 전체가 깨진다
         assertThat(weather.precipitation()).isEqualTo("-");
         assertThat(weather.precptType()).isEqualTo("없음");
         assertThat(weather.pcpMsg()).isEqualTo("비 또는 눈 소식이 없어요.");
-        assertThat(weather.pm10()).isEqualTo("30");
-        assertThat(weather.pm10Index()).isEqualTo("좋음");
-        assertThat(weather.pm25()).isEqualTo("13");
-        assertThat(weather.airIdx()).isEqualTo("좋음");
+        assertThat(weather.pm10()).isEqualTo("46");
+        assertThat(weather.pm10Index()).isEqualTo("보통");
+        assertThat(weather.pm25()).isEqualTo("29");
+        assertThat(weather.airIdx()).isEqualTo("보통");
         assertThat(weather.uvIndex()).isEqualTo("0");
         assertThat(weather.uvIndexLvl()).isEqualTo("낮음");
         // 일출·일몰은 날짜가 없어 KST 그대로 둔다
-        assertThat(weather.sunrise()).isEqualTo("06:28");
-        assertThat(weather.sunset()).isEqualTo("18:14");
-        // 픽스처의 2026-10-03 00:00 KST = 2026-10-02 15:00 UTC
-        assertThat(weather.weatherTime()).isEqualTo(LocalDateTime.of(2026, 10, 2, 15, 0));
+        assertThat(weather.sunrise()).isEqualTo("06:37");
+        assertThat(weather.sunset()).isEqualTo("18:00");
+        // 픽스처의 2026-10-13 00:30 KST = 2026-10-12 15:30 UTC
+        assertThat(weather.weatherTime()).isEqualTo(LocalDateTime.of(2026, 10, 12, 15, 30));
+    }
+
+    @Test
+    @DisplayName("WEATHER_STTS가 배열이 아니라 객체로 와도 파싱한다")
+    void 날씨_구역이_객체여도_파싱한다() {
+        // 서울시 응답은 한 건일 때 구역이 객체로 바뀌는 경우가 있어 둘 다 받아낸다
+        mockServer.expect(requestTo(expectedWeatherUri(AREA_NAME)))
+                .andRespond(withSuccess(
+                        "{\"CITYDATA\":{\"WEATHER_STTS\":{\"TEMP\":\"22.6\",\"PM10\":\"46\"}}}",
+                        MediaType.APPLICATION_JSON));
+
+        SeoulWeatherResponse.Weather weather = seoulPublicDataService.fetchWeather(AREA_NAME);
+
+        assertThat(weather).isNotNull();
+        assertThat(weather.temp()).isEqualTo("22.6");
     }
 
     @Test
@@ -166,10 +181,10 @@ class SeoulPublicDataServiceTest {
                 seoulPublicDataService.fetchWeather(AREA_NAME).nextHour();
 
         assertThat(nextHour).isNotNull();
-        assertThat(nextHour.skyStts()).isEqualTo("맑음");
-        assertThat(nextHour.rainChance()).isEqualTo("0");
-        // 예보 시각만 "yyyyMMddHHmm"로 온다. 202610030100 KST = 2026-10-02 16:00 UTC
-        assertThat(nextHour.fcstDt()).isEqualTo(LocalDateTime.of(2026, 10, 2, 16, 0));
+        assertThat(nextHour.skyStts()).isEqualTo("흐림");
+        assertThat(nextHour.rainChance()).isEqualTo("60");
+        // 예보 시각만 "yyyyMMddHHmm"로 온다. 202610130100 KST = 2026-10-12 16:00 UTC
+        assertThat(nextHour.fcstDt()).isEqualTo(LocalDateTime.of(2026, 10, 12, 16, 0));
     }
 
     @Test
@@ -178,7 +193,7 @@ class SeoulPublicDataServiceTest {
         // 가산디지털단지역·서울대공원은 조회가 성공해도 WEATHER_STTS가 비어 온다
         mockServer.expect(requestTo(expectedWeatherUri(AREA_NAME)))
                 .andRespond(withSuccess(
-                        "{\"CITYDATA\":{\"AREA_NM\":\"가산디지털단지역\",\"WEATHER_STTS\":null}}",
+                        "{\"CITYDATA\":{\"AREA_NM\":\"가산디지털단지역\",\"WEATHER_STTS\":[]}}",
                         MediaType.APPLICATION_JSON));
 
         assertThat(seoulPublicDataService.fetchWeather(AREA_NAME)).isNull();

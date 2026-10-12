@@ -1,5 +1,5 @@
 {
-  "list_total_count": "1",
+  "list_total_count": 1,
   "RESULT": {
     "RESULT.CODE": "INFO-000",
     "RESULT.MESSAGE": "정상 처리되었습니다."
@@ -7,162 +7,158 @@
   "CITYDATA": {
     "AREA_NM": "광화문·덕수궁",
     "AREA_CD": "POI009",
-    "LIVE_PPLTN_STTS": {
-      "LIVE_PPLTN_STTS": {
+    "LIVE_PPLTN_STTS": [
+      {
         "AREA_NM": "광화문·덕수궁",
         "AREA_CD": "POI009",
         "AREA_CONGEST_LVL": "여유",
         "AREA_CONGEST_MSG": "사람이 몰려있을 가능성이 낮고 붐빔은 거의 느껴지지 않아요. 도보 이동이 자유로워요.",
-        "AREA_PPLTN_MIN": "6000",
-        "AREA_PPLTN_MAX": "6500",
-        "MALE_PPLTN_RATE": "57.0",
-        "FEMALE_PPLTN_RATE": "43.0",
-        "PPLTN_RATE_0": "1.0",
-        "PPLTN_RATE_10": "4.6",
-        "PPLTN_RATE_20": "21.1",
+        "AREA_PPLTN_MIN": "4500",
+        "AREA_PPLTN_MAX": "5000",
+        "MALE_PPLTN_RATE": "59.1",
+        "FEMALE_PPLTN_RATE": "40.9",
+        "PPLTN_RATE_0": "1.4",
+        "PPLTN_RATE_10": "3.7",
+        "PPLTN_RATE_20": "17.7",
         "PPLTN_RATE_30": "21.4",
-        "PPLTN_RATE_40": "19.9",
-        "PPLTN_RATE_50": "17.5",
-        "PPLTN_RATE_60": "9.2",
-        "PPLTN_RATE_70": "5.4",
-        "RESNT_PPLTN_RATE": "34.3",
-        "NON_RESNT_PPLTN_RATE": "65.7",
+        "PPLTN_RATE_40": "20.6",
+        "PPLTN_RATE_50": "18.5",
+        "PPLTN_RATE_60": "10.2",
+        "PPLTN_RATE_70": "6.5",
+        "RESNT_PPLTN_RATE": "43.5",
+        "NON_RESNT_PPLTN_RATE": "56.5",
         "REPLACE_YN": "N",
-        "PPLTN_TIME": "2026-10-02 23:35",
+        "PPLTN_TIME": "2026-10-13 00:00",
         "FCST_YN": "Y",
-        "FCST_PPLTN": {
-          "FCST_PPLTN": [
-            {
-              "FCST_TIME": "2026-10-03 01:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "3500",
-              "FCST_PPLTN_MAX": "4000"
-            },
-            {
-              "FCST_TIME": "2026-10-03 02:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "2000",
-              "FCST_PPLTN_MAX": "2500"
-            },
-            {
-              "FCST_TIME": "2026-10-03 03:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "1000",
-              "FCST_PPLTN_MAX": "1500"
-            },
-            {
-              "FCST_TIME": "2026-10-03 04:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "600",
-              "FCST_PPLTN_MAX": "700"
-            },
-            {
-              "FCST_TIME": "2026-10-03 05:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "600",
-              "FCST_PPLTN_MAX": "700"
-            },
-            {
-              "FCST_TIME": "2026-10-03 06:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "1000",
-              "FCST_PPLTN_MAX": "1500"
-            },
-            {
-              "FCST_TIME": "2026-10-03 07:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "2000",
-              "FCST_PPLTN_MAX": "2500"
-            },
-            {
-              "FCST_TIME": "2026-10-03 08:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "4000",
-              "FCST_PPLTN_MAX": "4500"
-            },
-            {
-              "FCST_TIME": "2026-10-03 09:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "8000",
-              "FCST_PPLTN_MAX": "8500"
-            },
-            {
-              "FCST_TIME": "2026-10-03 10:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "12000",
-              "FCST_PPLTN_MAX": "14000"
-            },
-            {
-              "FCST_TIME": "2026-10-03 11:00",
-              "FCST_CONGEST_LVL": "여유",
-              "FCST_PPLTN_MIN": "18000",
-              "FCST_PPLTN_MAX": "20000"
-            },
-            {
-              "FCST_TIME": "2026-10-03 12:00",
-              "FCST_CONGEST_LVL": "약간 붐빔",
-              "FCST_PPLTN_MIN": "38000",
-              "FCST_PPLTN_MAX": "40000"
-            }
-          ]
-        }
+        "FCST_PPLTN": [
+          {
+            "FCST_TIME": "2026-10-13 01:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "3000",
+            "FCST_PPLTN_MAX": "3500"
+          },
+          {
+            "FCST_TIME": "2026-10-13 02:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "2500",
+            "FCST_PPLTN_MAX": "3000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 03:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "2000",
+            "FCST_PPLTN_MAX": "2500"
+          },
+          {
+            "FCST_TIME": "2026-10-13 04:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "2500",
+            "FCST_PPLTN_MAX": "3000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 05:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "3000",
+            "FCST_PPLTN_MAX": "3500"
+          },
+          {
+            "FCST_TIME": "2026-10-13 06:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "4500",
+            "FCST_PPLTN_MAX": "5000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 07:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "8000",
+            "FCST_PPLTN_MAX": "8500"
+          },
+          {
+            "FCST_TIME": "2026-10-13 08:00",
+            "FCST_CONGEST_LVL": "여유",
+            "FCST_PPLTN_MIN": "16000",
+            "FCST_PPLTN_MAX": "18000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 09:00",
+            "FCST_CONGEST_LVL": "보통",
+            "FCST_PPLTN_MIN": "28000",
+            "FCST_PPLTN_MAX": "30000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 10:00",
+            "FCST_CONGEST_LVL": "보통",
+            "FCST_PPLTN_MIN": "32000",
+            "FCST_PPLTN_MAX": "34000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 11:00",
+            "FCST_CONGEST_LVL": "보통",
+            "FCST_PPLTN_MIN": "34000",
+            "FCST_PPLTN_MAX": "36000"
+          },
+          {
+            "FCST_TIME": "2026-10-13 12:00",
+            "FCST_CONGEST_LVL": "보통",
+            "FCST_PPLTN_MIN": "32000",
+            "FCST_PPLTN_MAX": "34000"
+          }
+        ]
       }
-    },
-    "WEATHER_STTS": {
-      "WEATHER_STTS": {
-        "WEATHER_TIME": "2026-10-03 00:00",
-        "TEMP": "14.7",
-        "MAX_TEMP": "23.0",
-        "MIN_TEMP": "11.0",
-        "HUMIDITY": "44",
+    ],
+    "WEATHER_STTS": [
+      {
+        "WEATHER_TIME": "2026-10-13 00:30",
+        "TEMP": "22.6",
+        "MAX_TEMP": "22.0",
+        "MIN_TEMP": "17.0",
+        "HUMIDITY": "63",
         "WIND_DIRCT": "SE",
         "WIND_SPD": "1.5",
         "PRECIPITATION": "-",
         "PRECPT_TYPE": "없음",
         "PCP_MSG": "비 또는 눈 소식이 없어요.",
-        "SUNRISE": "06:28",
-        "SUNSET": "18:14",
+        "SUNRISE": "06:37",
+        "SUNSET": "18:00",
         "UV_INDEX_LVL": "낮음",
         "UV_INDEX": "0",
         "UV_MSG": "햇볕에 민감한 분들은 자외선 차단제를 발라주세요.",
-        "PM25_INDEX": "좋음",
-        "PM25": "13",
-        "PM10_INDEX": "좋음",
-        "PM10": "30",
-        "AIR_IDX": "좋음",
-        "AIR_IDX_MVL": "42.0",
-        "AIR_IDX_MAIN": null,
-        "AIR_MSG": "대기질에 이상이 없어요.",
-        "FCST24HOURS": {
-          "FCST24HOURS": [
-            {
-              "FCST_DT": "202610030100",
-              "TEMP": "13",
-              "PRECIPITATION": "-",
-              "PRECPT_TYPE": "없음",
-              "RAIN_CHANCE": "0",
-              "SKY_STTS": "맑음"
-            },
-            {
-              "FCST_DT": "202610030200",
-              "TEMP": "12",
-              "PRECIPITATION": "-",
-              "PRECPT_TYPE": "없음",
-              "RAIN_CHANCE": "0",
-              "SKY_STTS": "맑음"
-            },
-            {
-              "FCST_DT": "202610030300",
-              "TEMP": "12",
-              "PRECIPITATION": "-",
-              "PRECPT_TYPE": "없음",
-              "RAIN_CHANCE": "0",
-              "SKY_STTS": "맑음"
-            }
-          ]
-        },
-        "NEWS_LIST": null
+        "PM25_INDEX": "보통",
+        "PM25": "29",
+        "PM10_INDEX": "보통",
+        "PM10": "46",
+        "AIR_IDX": "보통",
+        "AIR_IDX_MVL": "77.0",
+        "AIR_IDX_MAIN": "",
+        "AIR_MSG": "호흡기가 예민하신 분들은 몸상태 유의하며 활동해주세요.",
+        "FCST24HOURS": [
+          {
+            "FCST_DT": "202610130100",
+            "TEMP": "21",
+            "PRECIPITATION": "-",
+            "PRECPT_TYPE": "없음",
+            "RAIN_CHANCE": "60",
+            "SKY_STTS": "흐림"
+          },
+          {
+            "FCST_DT": "202610130200",
+            "TEMP": "21",
+            "PRECIPITATION": "1 미만",
+            "PRECPT_TYPE": "비",
+            "RAIN_CHANCE": "60",
+            "SKY_STTS": "흐림"
+          },
+          {
+            "FCST_DT": "202610130300",
+            "TEMP": "20",
+            "PRECIPITATION": "1.0",
+            "PRECPT_TYPE": "비",
+            "RAIN_CHANCE": "60",
+            "SKY_STTS": "흐림"
+          }
+        ],
+        "NEWS_LIST": []
       }
-    }
+    ]
   }
 }

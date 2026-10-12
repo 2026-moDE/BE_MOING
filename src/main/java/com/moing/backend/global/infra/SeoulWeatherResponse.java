@@ -16,8 +16,9 @@ import java.util.List;
  * 응답에는 도로소통·주차장·따릉이 등 쓰지 않는 구역도 함께 담겨 오므로(지역당 100KB 내외)
  * 5분 캐싱을 전제로 호출한다.
  *
- * <p>구역이 {@code CITYDATA.WEATHER_STTS.WEATHER_STTS}로 한 번 더 감싸여 있다.
- * 예보도 {@code FCST24HOURS.FCST24HOURS}로 같은 모양이다.
+ * <p>{@code CITYDATA.WEATHER_STTS}는 한 건만 들어 있어도 <b>배열</b>로 온다. 예보
+ * ({@code FCST24HOURS})도 배열이다. 서울시 응답에 한 건일 때 객체로 바뀌는 구역이 섞여 있어
+ * {@code ACCEPT_SINGLE_VALUE_AS_ARRAY}로 둘 다 받아낸다.
  *
  * <p><b>모든 값이 문자열로 내려온다.</b> 강수량처럼 값이 없을 때 {@code "-"}를 쓰는 필드가
  * 있어 숫자로 바로 받으면 역직렬화가 응답 전체를 들고 실패한다. 그래서 문자열로 담고
@@ -49,18 +50,21 @@ public record SeoulWeatherResponse(
      * 있다(가산디지털단지역·서울대공원). 중간 어디가 비어도 null로 끝낸다.
      */
     public Weather weather() {
-        if (cityData == null || cityData.weatherStts() == null) return null;
-        return cityData.weatherStts().weather();
+        if (cityData == null || cityData.weatherStts() == null || cityData.weatherStts().isEmpty()) {
+            return null;
+        }
+        return cityData.weatherStts().get(0);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Result(@JsonProperty("RESULT.CODE") String code) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record CityData(@JsonProperty("WEATHER_STTS") WeatherWrapper weatherStts) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record WeatherWrapper(@JsonProperty("WEATHER_STTS") Weather weather) {}
+    public record CityData(
+            @JsonProperty("WEATHER_STTS")
+            @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+            List<Weather> weatherStts
+    ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Weather(
@@ -94,7 +98,9 @@ public record SeoulWeatherResponse(
             @JsonProperty("AIR_MSG") String airMsg,
 
             /** 1시간 간격 24건. 기준 시각이 아니라 다음 정시부터 시작한다 */
-            @JsonProperty("FCST24HOURS") ForecastWrapper fcst24Hours
+            @JsonProperty("FCST24HOURS")
+            @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+            List<HourlyForecast> fcst24Hours
     ) {
         public Weather {
             weatherTime = toUtc(weatherTime);
@@ -102,16 +108,12 @@ public record SeoulWeatherResponse(
 
         /** 다음 정시 예보. 현재 하늘 상태(맑음/흐림)는 응답에 없어 이걸로 대신한다 */
         public HourlyForecast nextHour() {
-            if (fcst24Hours == null || fcst24Hours.forecasts() == null
-                    || fcst24Hours.forecasts().isEmpty()) {
+            if (fcst24Hours == null || fcst24Hours.isEmpty()) {
                 return null;
             }
-            return fcst24Hours.forecasts().get(0);
+            return fcst24Hours.get(0);
         }
     }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ForecastWrapper(@JsonProperty("FCST24HOURS") List<HourlyForecast> forecasts) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record HourlyForecast(

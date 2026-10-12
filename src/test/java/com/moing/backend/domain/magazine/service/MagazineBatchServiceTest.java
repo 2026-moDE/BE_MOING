@@ -1,5 +1,6 @@
 package com.moing.backend.domain.magazine.service;
 
+import com.moing.backend.domain.magazine.dto.MagazineGenerateResponse;
 import com.moing.backend.domain.magazine.entity.Magazine;
 import com.moing.backend.domain.magazine.entity.MagazineItem;
 import com.moing.backend.domain.magazine.entity.MagazineRule;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -105,9 +107,10 @@ class MagazineBatchServiceTest {
     void 후보가_부족하면_만들지_않는다() {
         givenCandidates(List.of(CongestionLevel.RELAXED), review(1L, 10L));   // 1개뿐
 
-        int created = service().generate();
+        MagazineGenerateResponse response = service().generate();
 
-        assertThat(created).isZero();
+        assertThat(response.createdCount()).isZero();
+        assertThat(response.magazines()).isEmpty();
         verify(magazineRepository, never()).save(any(Magazine.class));
     }
 
@@ -218,7 +221,30 @@ class MagazineBatchServiceTest {
         givenCandidates(List.of(CongestionLevel.RELAXED), review(1L, 10L), review(2L, 20L));
         givenCandidates(List.of(CongestionLevel.VERY_CROWDED), review(3L, 30L), review(4L, 40L));
 
-        assertThat(service().generate()).isEqualTo(2);
+        assertThat(service().generate().createdCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("생성 결과에 만든 묶음과 건너뛴 규칙을 담아 돌려준다")
+    void 생성_결과를_돌려준다() {
+        givenCandidates(List.of(CongestionLevel.RELAXED), review(1L, 10L), review(2L, 20L));
+        givenCandidates(List.of(CongestionLevel.VERY_CROWDED), review(3L, 30L));   // 1개뿐
+
+        MagazineGenerateResponse response = service().generate();
+
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(response.generatedAt()).isEqualTo(NOW);
+        assertThat(response.magazines())
+                .extracting(MagazineGenerateResponse.Created::ruleKey,
+                        MagazineGenerateResponse.Created::title,
+                        MagazineGenerateResponse.Created::itemCount)
+                .containsExactly(tuple(MagazineRule.RELAXED_CAFE, "지금 한산한 카페", 2));
+
+        // 후보가 몇 개였는지까지 담아야 데이터 부족인지 조건 문제인지 가려낼 수 있다
+        assertThat(response.skipped())
+                .extracting(MagazineGenerateResponse.Skipped::ruleKey,
+                        MagazineGenerateResponse.Skipped::candidateCount)
+                .contains(tuple(MagazineRule.CROWDED, 1), tuple(MagazineRule.TODAY, 0));
     }
 
     /** 특정 혼잡도 조건으로 들어오는 조회에만 후보를 돌려준다 */

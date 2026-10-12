@@ -1,5 +1,6 @@
 package com.moing.backend.domain.magazine.service;
 
+import com.moing.backend.domain.magazine.dto.MagazineGenerateResponse;
 import com.moing.backend.domain.magazine.entity.Magazine;
 import com.moing.backend.domain.magazine.entity.MagazineItem;
 import com.moing.backend.domain.magazine.entity.MagazineRule;
@@ -71,21 +72,24 @@ public class MagazineBatchService {
      * 빈 바텀시트보다 하루 지난 묶음이 낫다. 그래서 스케줄러를 이 클래스 안에 두지 않는다 —
      * 같은 빈 안에서 부르면 프록시를 타지 않아 이 애너테이션이 아무 일도 하지 않는다.
      *
-     * @return 만들어진 묶음 수
+     * @return 규칙별 생성·건너뛴 결과 (관리자가 수동 실행할 때 쓴다)
      */
     @Transactional
-    public int generate() {
+    public MagazineGenerateResponse generate() {
         // 아이템을 먼저 지운다. 외래키가 없어 순서를 바꿔도 에러는 안 나지만 고아 행이 남는다
         magazineItemRepository.deleteAllInBatch();
         magazineRepository.deleteAllInBatch();
 
-        int created = 0;
+        List<MagazineGenerateResponse.Created> created = new ArrayList<>();
+        List<MagazineGenerateResponse.Skipped> skipped = new ArrayList<>();
+
         for (MagazineRule rule : MagazineRule.values()) {
             List<Review> picked = pick(rule);
 
             if (picked.size() < MIN_ITEMS) {
                 // 빈 묶음이 뜨는 것보다 아예 없는 게 낫다
                 log.info("[Magazine] {} 건너뜀 (후보 {}개)", rule, picked.size());
+                skipped.add(new MagazineGenerateResponse.Skipped(rule, picked.size()));
                 continue;
             }
 
@@ -97,12 +101,14 @@ public class MagazineBatchService {
             }
             magazineItemRepository.saveAll(items);
 
-            created++;
+            created.add(new MagazineGenerateResponse.Created(
+                    magazine.getId(), rule, magazine.getTitle(), items.size()));
             log.info("[Magazine] {} 생성 ({}개)", rule, items.size());
         }
 
-        log.info("[Magazine] 묶음 {}개 생성 완료", created);
-        return created;
+        log.info("[Magazine] 묶음 {}개 생성, {}개 건너뜀", created.size(), skipped.size());
+        return new MagazineGenerateResponse(
+                created.size(), LocalDateTime.now(clock), created, skipped);
     }
 
     /** 규칙에 맞는 리뷰를 모아 장소 중복을 걷어내고 최대 {@link #MAX_ITEMS}개로 자른다 */

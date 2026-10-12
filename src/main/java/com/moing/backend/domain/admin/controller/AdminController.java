@@ -19,6 +19,8 @@ import com.moing.backend.domain.admin.service.AdminReviewService;
 import com.moing.backend.domain.admin.service.AdminStatsService;
 import com.moing.backend.domain.admin.service.AdminUserService;
 import com.moing.backend.domain.congestion.dto.SeoulAreaSyncResponse;
+import com.moing.backend.domain.magazine.dto.MagazineGenerateResponse;
+import com.moing.backend.domain.magazine.service.MagazineBatchService;
 import com.moing.backend.domain.congestion.service.SeoulAreaSyncService;
 import com.moing.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +55,7 @@ public class AdminController {
     private final AdminReviewService adminReviewService;
     private final AdminUserService adminUserService;
     private final SeoulAreaSyncService seoulAreaSyncService;
+    private final MagazineBatchService magazineBatchService;
 
     @Operation(summary = "관리자 로그인", description = "이메일과 비밀번호로 관리자 로그인 후 JWT 토큰을 발급합니다.")
     @ApiResponses({
@@ -168,5 +171,18 @@ public class AdminController {
     @PostMapping("/seoul-areas/sync")
     public ResponseEntity<ApiResponse<SeoulAreaSyncResponse>> syncSeoulAreas() {
         return ResponseEntity.ok(ApiResponse.success("동기화 완료", seoulAreaSyncService.sync()));
+    }
+
+    @Operation(summary = "홈 매거진 묶음 재생성",
+            description = "기존 묶음을 전부 지우고 조건에 맞는 리뷰로 다시 만듭니다. "
+                    + "매일 새벽 4시(KST)에 자동으로 돌므로 평소에는 호출할 필요가 없고, "
+                    + "배포 직후 바로 채우거나 묶음 조건을 바꾼 뒤 확인할 때 쓰는 API입니다. "
+                    + "조건에 맞는 리뷰가 2개 미만인 규칙은 만들지 않고 skipped에 후보 수와 함께 담깁니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "재생성 완료")
+    })
+    @PostMapping("/magazines/generate")
+    public ResponseEntity<ApiResponse<MagazineGenerateResponse>> generateMagazines() {
+        return ResponseEntity.ok(ApiResponse.success("재생성 완료", magazineBatchService.generate()));
     }
 }

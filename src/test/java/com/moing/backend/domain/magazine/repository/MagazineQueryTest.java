@@ -43,6 +43,9 @@ class MagazineQueryTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 13, 12, 0);
 
+    /** 기간 제한 없는 규칙이 넘기는 값 (null을 쓰면 PostgreSQL이 파라미터 타입을 추론 못 한다) */
+    private static final LocalDateTime NO_TIME_LIMIT = LocalDateTime.of(1970, 1, 1, 0, 0);
+
     @Autowired
     private ReviewRepository reviewRepository;
 
@@ -76,7 +79,7 @@ class MagazineQueryTest {
         insertReview(3L, 2L, "RELAXED", NOW);          // 음식점 + 여유
 
         List<Review> found = reviewRepository.findMagazineCandidates(
-                List.of(CongestionLevel.RELAXED), List.of(PlaceCategory.CAFE), null, limit());
+                List.of(CongestionLevel.RELAXED), List.of(PlaceCategory.CAFE), NO_TIME_LIMIT, limit());
 
         assertThat(found).extracting(Review::getId).containsExactly(1L);
     }
@@ -89,13 +92,13 @@ class MagazineQueryTest {
         insertReview(3L, 3L, "RELAXED", NOW);   // ETC
 
         List<Review> found = reviewRepository.findMagazineCandidates(
-                MagazineRule.ANY_LEVEL, MagazineRule.INDOOR_CATEGORIES, null, limit());
+                MagazineRule.ANY_LEVEL, MagazineRule.INDOOR_CATEGORIES, NO_TIME_LIMIT, limit());
 
         assertThat(found).extracting(Review::getId).containsExactlyInAnyOrder(1L, 2L);
     }
 
     @Test
-    @DisplayName("since를 주면 그 이후 리뷰만, 안 주면 기간 제한이 없다")
+    @DisplayName("since로 기간을 자른다")
     void since로_기간을_자른다() {
         insertReview(1L, 1L, "RELAXED", NOW.minusHours(1));
         insertReview(2L, 2L, "RELAXED", NOW.minusDays(5));
@@ -104,8 +107,9 @@ class MagazineQueryTest {
                 MagazineRule.ANY_LEVEL, allCategories(), NOW.minusHours(24), limit()))
                 .extracting(Review::getId).containsExactly(1L);
 
+        // 기간 제한이 없는 규칙은 충분히 과거의 시각을 넘긴다
         assertThat(reviewRepository.findMagazineCandidates(
-                MagazineRule.ANY_LEVEL, allCategories(), null, limit()))
+                MagazineRule.ANY_LEVEL, allCategories(), NO_TIME_LIMIT, limit()))
                 .extracting(Review::getId).containsExactly(1L, 2L);
     }
 
@@ -118,7 +122,7 @@ class MagazineQueryTest {
         insert(4L, 1L, 4L, "RELAXED", NOW, null, false, "PUBLIC");                  // 사진 없음
 
         List<Review> found = reviewRepository.findMagazineCandidates(
-                MagazineRule.ANY_LEVEL, allCategories(), null, limit());
+                MagazineRule.ANY_LEVEL, allCategories(), NO_TIME_LIMIT, limit());
 
         assertThat(found).extracting(Review::getId).containsExactly(1L);
     }
@@ -144,7 +148,7 @@ class MagazineQueryTest {
         insertReview(3L, 3L, "RELAXED", NOW.minusHours(2));
 
         List<Review> found = reviewRepository.findMagazineCandidates(
-                MagazineRule.ANY_LEVEL, allCategories(), null, PageRequest.of(0, 2));
+                MagazineRule.ANY_LEVEL, allCategories(), NO_TIME_LIMIT, PageRequest.of(0, 2));
 
         assertThat(found).extracting(Review::getId).containsExactly(2L, 3L);
     }

@@ -347,6 +347,11 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
      * <p>호출부가 장소별로 하나만 남기고 5개로 자르므로, 넉넉히 받아 두려면 Pageable로
      * 필요한 수의 몇 배를 가져간다. 조건을 바꾸면
      * {@link #findMagazineCandidatesByCreatedHours}도 같이 고쳐야 규칙 간 기준이 어긋나지 않는다.
+     *
+     * <p><b>{@code since}에 null을 받지 않는다.</b> {@code (:since IS NULL OR ...)}로 쓰면
+     * PostgreSQL이 {@code ? IS NULL}의 파라미터 타입을 추론하지 못해
+     * {@code could not determine data type of parameter}로 쿼리가 거부된다(H2는 통과해서
+     * 테스트로는 걸리지 않는다). 기간 제한이 없는 규칙은 호출부가 충분히 과거의 시각을 넘긴다.
      */
     @Query("""
             SELECT r FROM Review r
@@ -355,7 +360,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND (r.visibility IS NULL
                    OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
               AND r.congestionLevel IN :levels
-              AND (:since IS NULL OR r.createdAt > :since)
+              AND r.createdAt > :since
               AND r.placeId IN (SELECT p.id FROM Place p
                                 WHERE p.isActive = true AND p.category IN :categories)
             ORDER BY r.createdAt DESC, r.id DESC

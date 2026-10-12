@@ -1,8 +1,10 @@
 package com.moing.backend.domain.congestion.service;
 
 import com.moing.backend.domain.congestion.dto.CongestionResponse;
+import com.moing.backend.domain.congestion.dto.SeoulAreaSearchResponse;
 import com.moing.backend.domain.congestion.entity.SeoulArea;
 import com.moing.backend.domain.congestion.repository.SeoulAreaRepository;
+import com.moing.backend.domain.follow.util.ChosungUtil;
 import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.global.exception.CustomException;
 import com.moing.backend.global.exception.ErrorCode;
@@ -57,6 +59,31 @@ public class CongestionService {
                 row.areaPpltnMax(),
                 row.ppltnTime(),
                 toForecast(row.fcstPpltn()));
+    }
+
+    /**
+     * 사용자가 고를 수 있는 지역을 검색한다.
+     *
+     * <p>선택 대상은 서울시가 실시간 인구를 내려주는 지역뿐이므로 {@code seoul_areas}만 본다.
+     * 여기 없는 곳을 고르면 혼잡도 조회가 빈손으로 끝나기 때문에 외부 검색을 섞지 않는다.
+     *
+     * <p>전체가 121곳뿐이라 커서·개수 제한 없이 일치하는 지역을 모두 내려준다.
+     *
+     * @param keyword 비어 있으면 전체 목록 (검색창 초기 화면용)
+     */
+    public SeoulAreaSearchResponse searchAreas(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return SeoulAreaSearchResponse.from(seoulAreaRepository.findAllByOrderByAreaNmAsc());
+        }
+
+        String trimmed = keyword.trim();
+
+        // 초성이 섞여 있으면 부분 일치로는 잡히지 않으므로 정규식으로 찾는다 ("ㅎㄷ" → 홍대입구역)
+        List<SeoulArea> areas = ChosungUtil.hasChosung(trimmed)
+                ? seoulAreaRepository.findByAreaNmRegex(ChosungUtil.toRegexPattern(trimmed))
+                : seoulAreaRepository.findByAreaNmContainingIgnoreCaseOrderByAreaNmAsc(trimmed);
+
+        return SeoulAreaSearchResponse.from(areas);
     }
 
     private SeoulArea findNearestArea(double latitude, double longitude) {

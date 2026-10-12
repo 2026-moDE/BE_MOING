@@ -81,4 +81,40 @@ class SeoulAreaRepositoryTest {
 
         assertThat(removed).extracting(SeoulArea::getAreaNm).containsExactly("서울숲공원");
     }
+
+    @Test
+    @DisplayName("지역 선택 목록은 가나다순이다")
+    void 전체_목록은_가나다순이다() {
+        assertThat(seoulAreaRepository.findAllByOrderByAreaNmAsc())
+                .extracting(SeoulArea::getAreaNm)
+                .containsExactly("서울숲공원", "서울역", "성수카페거리");
+    }
+
+    @Test
+    @DisplayName("지역명 부분 일치로 검색한다")
+    void 부분_일치로_검색한다() {
+        assertThat(seoulAreaRepository.findByAreaNmContainingIgnoreCaseOrderByAreaNmAsc("서울"))
+                .extracting(SeoulArea::getAreaNm)
+                .containsExactly("서울숲공원", "서울역");
+    }
+
+    @Test
+    @DisplayName("초성으로 검색한다")
+    void 초성으로_검색한다() {
+        // "ㅅㅇ" → 서울숲공원(ㅅㅇㅅㄱㅇ)·서울역(ㅅㅇㅇ)
+        assertThat(seoulAreaRepository.findByAreaNmRegex("[사-싷][아-잏]"))
+                .extracting(SeoulArea::getAreaNm)
+                .containsExactly("서울숲공원", "서울역");
+
+        // "ㅅㅅ" → 성수카페거리(ㅅㅅㅋㅍㄱㄹ)만. 초성이 연속으로 맞아야 걸린다
+        assertThat(seoulAreaRepository.findByAreaNmRegex("[사-싷][사-싷]"))
+                .extracting(SeoulArea::getAreaNm)
+                .containsExactly("성수카페거리");
+    }
+
+    @Test
+    @DisplayName("일치하는 지역이 없으면 빈 목록이다")
+    void 일치하지_않으면_빈_목록이다() {
+        assertThat(seoulAreaRepository.findByAreaNmContainingIgnoreCaseOrderByAreaNmAsc("부산")).isEmpty();
+    }
 }

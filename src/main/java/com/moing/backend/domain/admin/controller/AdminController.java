@@ -179,7 +179,8 @@ public class AdminController {
                     + "배포 직후 바로 채우거나 묶음 조건을 바꾼 뒤 확인할 때 쓰는 API입니다. "
                     + "조건에 맞는 리뷰가 2개 미만인 규칙은 만들지 않고 skipped에 후보 수와 함께 담깁니다.")
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "재생성 완료")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "재생성 완료"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "자동 배치나 다른 호출이 이미 생성 중입니다")
     })
     @PostMapping("/magazines/generate")
     public ResponseEntity<ApiResponse<MagazineGenerateResponse>> generateMagazines() {

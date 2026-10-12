@@ -10,6 +10,8 @@ import com.moing.backend.domain.place.entity.PlaceCategory;
 import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.repository.ReviewRepository;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -60,6 +62,14 @@ public class MagazineBatchService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    /**
+     * 배치 중복 실행을 막는 DB 락 키.
+     *
+     * <p>어드바이저리 락 키는 DB 전체에서 공유되므로, 다른 배치에 락을 쓸 때는 이 값과
+     * 겹치지 않는 숫자를 골라야 한다.
+     */
+    private static final long BATCH_LOCK_KEY = 1_000_001L;
+
     private final ReviewRepository reviewRepository;
     private final MagazineRepository magazineRepository;
     private final MagazineItemRepository magazineItemRepository;
@@ -76,6 +86,12 @@ public class MagazineBatchService {
      */
     @Transactional
     public MagazineGenerateResponse generate() {
+        // 서버가 여러 대면 같은 시각에 모두 깨어난다. 먼저 잡은 쪽만 실행하고 나머지는 돌려보낸다.
+        // 기다리지 않고 바로 포기하는 이유는, 뒤이어 또 전체를 다시 만들 이유가 없기 때문이다
+        if (!magazineRepository.tryAdvisoryLock(BATCH_LOCK_KEY)) {
+            throw new CustomException(ErrorCode.MAGAZINE_GENERATION_IN_PROGRESS);
+        }
+
         // 아이템을 먼저 지운다. 외래키가 없어 순서를 바꿔도 에러는 안 나지만 고아 행이 남는다
         magazineItemRepository.deleteAllInBatch();
         magazineRepository.deleteAllInBatch();

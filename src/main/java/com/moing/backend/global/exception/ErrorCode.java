@@ -57,6 +57,7 @@ public enum ErrorCode {
 
     // --- 매거진 관련 ---
     MAGAZINE_NOT_FOUND(HttpStatus.NOT_FOUND, "매거진을 찾을 수 없습니다"),
+    MAGAZINE_GENERATION_IN_PROGRESS(HttpStatus.CONFLICT, "매거진 생성이 이미 진행 중입니다"),
 
     // --- 관리자 관련 ---
     ADMIN_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");

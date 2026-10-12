@@ -1,5 +1,7 @@
 package com.moing.backend.domain.magazine.service;
 
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,6 +26,14 @@ public class MagazineBatchScheduler {
     public void generateDaily() {
         try {
             magazineBatchService.generate();
+        } catch (CustomException e) {
+            if (e.getErrorCode() == ErrorCode.MAGAZINE_GENERATION_IN_PROGRESS) {
+                // 서버가 여러 대면 모두 같은 시각에 깨어나는 게 정상이다. 실패가 아니라 정상 흐름이라
+                // warn으로 올리지 않는다 — 매일 뜨는 경고는 진짜 문제를 가린다
+                log.info("[Magazine] 다른 인스턴스가 생성 중이라 건너뛴다");
+                return;
+            }
+            log.warn("[Magazine] 묶음 생성 실패: {}", e.getMessage(), e);
         } catch (RuntimeException e) {
             // 트랜잭션이 되돌아가 어제 묶음이 그대로 남는다. 다음 날 다시 시도한다.
             log.warn("[Magazine] 묶음 생성 실패: {}", e.getMessage(), e);

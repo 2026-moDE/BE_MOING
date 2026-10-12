@@ -11,6 +11,8 @@ import com.moing.backend.domain.review.entity.CongestionLevel;
 import com.moing.backend.domain.review.entity.Review;
 import com.moing.backend.domain.review.entity.Visibility;
 import com.moing.backend.domain.review.repository.ReviewRepository;
+import com.moing.backend.global.exception.CustomException;
+import com.moing.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,9 +29,11 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -71,6 +75,9 @@ class MagazineBatchServiceTest {
             savedItems.addAll(items);
             return items;
         });
+
+        // 기본값: 락을 잡는다. 못 잡는 경우는 따로 테스트한다
+        when(magazineRepository.tryAdvisoryLock(anyLong())).thenReturn(true);
 
         // 기본값: 어느 규칙도 후보가 없다. 테스트가 필요한 규칙만 채운다
         when(reviewRepository.findMagazineCandidates(anyList(), anyList(), any(), any(Pageable.class)))
@@ -245,6 +252,35 @@ class MagazineBatchServiceTest {
                 .extracting(MagazineGenerateResponse.Skipped::ruleKey,
                         MagazineGenerateResponse.Skipped::candidateCount)
                 .contains(tuple(MagazineRule.CROWDED, 1), tuple(MagazineRule.TODAY, 0));
+    }
+
+    @Test
+    @DisplayName("다른 인스턴스가 락을 들고 있으면 아무것도 하지 않고 409로 끊는다")
+    void 락을_못_잡으면_409다() {
+        when(magazineRepository.tryAdvisoryLock(anyLong())).thenReturn(false);
+        givenCandidates(List.of(CongestionLevel.RELAXED), review(1L, 10L), review(2L, 20L));
+
+        assertThatThrownBy(() -> service().generate())
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.MAGAZINE_GENERATION_IN_PROGRESS);
+
+        // 지우지도, 만들지도 않아야 한다 — 한쪽이 지운 뒤 다른 쪽이 넣는 상태를 막는 게 목적이다
+        verify(magazineItemRepository, never()).deleteAllInBatch();
+        verify(magazineRepository, never()).deleteAllInBatch();
+        verify(magazineRepository, never()).save(any(Magazine.class));
+    }
+
+    @Test
+    @DisplayName("지우기 전에 락을 먼저 잡는다")
+    void 락을_먼저_잡는다() {
+        givenCandidates(List.of(CongestionLevel.RELAXED), review(1L, 10L), review(2L, 20L));
+
+        service().generate();
+
+        var order = inOrder(magazineRepository, magazineItemRepository);
+        order.verify(magazineRepository).tryAdvisoryLock(anyLong());
+        order.verify(magazineItemRepository).deleteAllInBatch();
     }
 
     /** 특정 혼잡도 조건으로 들어오는 조회에만 후보를 돌려준다 */

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,5 +45,16 @@ public class CongestionController {
     ) {
         return ResponseEntity.ok(ApiResponse.success("success",
                 congestionService.searchAreas(keyword)));
+    }
+
+    // 고른 지역의 실시간 혼잡도 + 12시간 예측 + 날씨
+    // /areas 검색 결과의 id를 그대로 넘긴다 (좌표로 최근접을 다시 찾으면 옆 지역이 잡힐 수 있다)
+    @GetMapping("/areas/{id}")
+    public ResponseEntity<ApiResponse<CongestionResponse>> getAreaCongestion(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                congestionService.getAreaCongestion(id)));
     }
 }

@@ -11,9 +11,11 @@ import java.util.List;
  * <p>사용자가 혼잡도를 볼 지역을 직접 고르는 화면에서 쓴다. 고를 수 있는 지역은
  * 서울시가 실시간 인구를 내려주는 121곳으로 한정되므로 {@code seoul_areas}만 조회한다.
  *
- * <p>좌표를 함께 내려주는 이유는 선택한 지역의 혼잡도를 바로
- * {@code GET /api/congestion/nearby}로 조회할 수 있게 하기 위함이다.
- * (지역 중심 좌표를 그대로 넘기면 자기 자신이 최근접 지역으로 매칭된다.)
+ * <p>고른 지역의 혼잡도는 {@code GET /api/congestion/areas/{id}}로 <b>id를 넘겨</b> 조회한다.
+ * 좌표를 넘겨 최근접 지역을 다시 찾게 하면 안 된다 — 121곳 중 314쌍이 서로 2km 안에 있고
+ * 가장 가까운 쌍은 74m밖에 떨어져 있지 않아(동대문 관광특구 ↔ DDP) 옆 지역이 잡힌다.
+ *
+ * <p>좌표는 지도에 핀을 찍는 용도로만 함께 내려준다.
  */
 public record SeoulAreaSearchResponse(List<AreaItem> areas) {
 

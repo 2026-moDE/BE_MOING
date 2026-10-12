@@ -334,6 +334,60 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("limit") int limit,
             @Param("offset") int offset);
 
+    /**
+     * 매거진 배치: 묶음 후보 리뷰 (최신순).
+     *
+     * <p>매거진은 불특정 사용자에게 노출되므로 친구 공개 리뷰는 조회자를 따지지 않고 전부
+     * 제외한다. 사진이 카드의 본문이라 이미지가 없는 리뷰도 뺀다.
+     *
+     * <p>혼잡도·카테고리를 가리지 않는 규칙은 전체 목록을 넘긴다. 그래서 혼잡도가 없는
+     * 옛 리뷰는 어느 묶음에도 들어가지 않는다(리뷰 작성에 혼잡도가 필수라 검증 전에 쌓인
+     * 행만 해당된다).
+     *
+     * <p>호출부가 장소별로 하나만 남기고 5개로 자르므로, 넉넉히 받아 두려면 Pageable로
+     * 필요한 수의 몇 배를 가져간다. 조건을 바꾸면
+     * {@link #findMagazineCandidatesByCreatedHours}도 같이 고쳐야 규칙 간 기준이 어긋나지 않는다.
+     */
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.isBlinded = false
+              AND r.imageUrl IS NOT NULL
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+              AND r.congestionLevel IN :levels
+              AND (:since IS NULL OR r.createdAt > :since)
+              AND r.placeId IN (SELECT p.id FROM Place p
+                                WHERE p.isActive = true AND p.category IN :categories)
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<Review> findMagazineCandidates(
+            @Param("levels") List<com.moing.backend.domain.review.entity.CongestionLevel> levels,
+            @Param("categories") List<com.moing.backend.domain.place.entity.PlaceCategory> categories,
+            @Param("since") LocalDateTime since,
+            Pageable pageable);
+
+    /**
+     * 매거진 배치: 특정 시각대에 작성된 묶음 후보 (최신순).
+     *
+     * <p>노출 조건은 {@link #findMagazineCandidates}와 같아야 한다.
+     *
+     * <p>{@code hours}는 저장된 {@code created_at}의 시(hour) 값이다. KST 몇 시인지는
+     * 저장 시각의 기준이 무엇이냐에 따라 달라지므로 호출부가 Java에서 환산해 넘긴다.
+     * 쿼리 안에서 NOW()나 시간대 변환을 하지 않는 이유다.
+     */
+    @Query("""
+            SELECT r FROM Review r
+            WHERE r.isBlinded = false
+              AND r.imageUrl IS NOT NULL
+              AND (r.visibility IS NULL
+                   OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+              AND HOUR(r.createdAt) IN :hours
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<Review> findMagazineCandidatesByCreatedHours(
+            @Param("hours") List<Integer> hours,
+            Pageable pageable);
+
     // 오늘 리뷰 수 (관리자 통계)
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
 

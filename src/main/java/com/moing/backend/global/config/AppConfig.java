@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Clock;
 import java.time.Duration;
 
 /**
@@ -28,6 +29,18 @@ public class AppConfig {
         factory.setConnectTimeout(Duration.ofSeconds(3));
         factory.setReadTimeout(Duration.ofSeconds(5));
         return new RestTemplate(factory);
+    }
+
+    /**
+     * 현재 시각.
+     *
+     * <p>시각에 따라 동작이 갈리는 코드(저녁 이후에만 노출하는 매거진 등)를 테스트에서
+     * 고정된 시각으로 돌리기 위해 빈으로 둔다. {@code LocalDateTime.now()}를 직접 부르면
+     * "오전에는 안 보인다"를 검증할 방법이 없다.
+     */
+    @Bean
+    public Clock clock() {
+        return Clock.systemDefaultZone();
     }
 
     /**

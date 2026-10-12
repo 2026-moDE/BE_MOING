@@ -66,6 +66,24 @@ public class CongestionService {
         return getCongestion(area);
     }
 
+    /**
+     * 좌표에서 가장 가까운 지역의 실시간 날씨만 조회한다.
+     *
+     * <p>혼잡도가 필요 없는 호출부(매거진 노출 조건 등)를 위한 것이다.
+     * {@link #getNearbyCongestion}을 쓰면 인구 API까지 함께 불리고, 그쪽이 실패하면 502가
+     * 나가 날씨만 알고 싶은 요청이 끊긴다.
+     *
+     * @return 날씨 (반경 내 지역이 없거나 서울시 응답이 비면 null — 예외를 던지지 않는다)
+     */
+    public CongestionResponse.Weather getNearbyWeather(double latitude, double longitude) {
+        return seoulAreaRepository
+                .findNearest(latitude, longitude, AREA_MATCH_RADIUS, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .map(area -> toWeather(seoulPublicDataService.fetchWeather(area.getAreaNm())))
+                .orElse(null);
+    }
+
     private CongestionResponse getCongestion(SeoulArea area) {
         SeoulCityDataResponse.Row row = seoulPublicDataService.fetchPopulation(area.getAreaNm());
         if (row == null) {

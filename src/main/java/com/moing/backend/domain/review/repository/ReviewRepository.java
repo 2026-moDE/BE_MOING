@@ -11,9 +11,36 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 리뷰 조회.
+ *
+ * <p><b>조회자가 있는 쿼리에는 차단 필터가 붙는다.</b> 내가 차단한 사용자와 나를 차단한
+ * 사용자의 리뷰를 양쪽 다 숨긴다 — 한쪽만 막으면 차단당한 사람이 상대 글을 계속 보고
+ * 댓글을 달 수 있어 차단이 의미가 없다. 조건은 어느 쿼리에서나 같은 모양이다:
+ *
+ * <pre>
+ * AND NOT EXISTS (SELECT b.id FROM Block b
+ *                 WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+ * AND NOT EXISTS (SELECT b2.id FROM Block b2
+ *                 WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
+ * </pre>
+ *
+ * <p><b>두 방향을 OR로 합친 하나의 NOT EXISTS로 바꾸지 말 것.</b> 결과는 같지만
+ * ({@code NOT (A OR B)} = {@code NOT A AND NOT B}) OR로 묶으면 PostgreSQL이 인덱스
+ * 탐색을 못 하고 차단 목록을 리뷰 행마다 선형으로 훑는다. 분리해 두면 각 절이 한 방향씩
+ * 인덱스를 정확히 집어 Index Only Scan이 된다 — 앞 절은 unique 제약의
+ * {@code (blocker_id, blocked_id)}, 뒤 절은 {@code idx_blocks_blocked_id_blocker_id}다.
+ * 실측(차단 20만 건, 리뷰 50만 건)에서 장소별 리뷰 목록이 OR 0.41ms, 분리 0.08ms였고,
+ * 장소별 상관 서브쿼리를 도는 인기 장소는 OR 965ms, 분리 222ms였다(차단 필터 전 175ms).
+ *
+ * <p>거르는 자리가 쿼리인 이유는 페이징이다. 받아온 뒤 메모리에서 빼면 차단된 리뷰가
+ * limit 자리를 차지해 응답이 모자라고, 대표 사진처럼 한 건만 뽑는 조회는 차단된 리뷰가
+ * 1등이면 그 아래 사진이 있는데도 빈 칸이 된다.
+ */
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 72h 이내 가장 최근 리뷰 (혼잡도)
+    // 혼잡도는 장소의 상태라 조회자별로 갈리지 않는다. 차단으로 가리지 않는 이유다
     Optional<Review> findTopByPlaceIdAndIsBlindedFalseAndCreatedAtAfterOrderByCreatedAtDesc(
             Long placeId, LocalDateTime since);
 
@@ -26,11 +53,16 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.isBlinded = false
               AND (r.visibility IS NULL
                    OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findTopWithImageByPlaceId(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
     // 시간 제한 없이 가장 최근 리뷰 (대표 사진, 전체 필터용, 친구 공개 리뷰 제외)
@@ -41,10 +73,15 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.isBlinded = false
               AND (r.visibility IS NULL
                    OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findTopWithImageAllTimeByPlaceId(
             @Param("placeId") Long placeId,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
     // 72h 이전 리뷰 중 가장 최근 리뷰 (대표 사진, 과거 필터용, 친구 공개 리뷰 제외)
@@ -56,11 +93,16 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.isBlinded = false
               AND (r.visibility IS NULL
                    OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findTopWithArchivedImageByPlaceId(
             @Param("placeId") Long placeId,
             @Param("since") LocalDateTime since,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
     // 72h 이내 리뷰 수 (상세 조회용)
@@ -78,6 +120,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                               WHERE f.followerId = :viewerId
                                 AND f.followingId = r.userId
                                 AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             """)
     long countVisibleCurrentReviews(
             @Param("placeId") Long placeId,
@@ -98,6 +144,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                               WHERE f.followerId = :viewerId
                                 AND f.followingId = r.userId
                                 AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             ORDER BY r.id DESC
             """)
     List<Review> findCurrentReviews(
@@ -121,6 +171,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                               WHERE f.followerId = :viewerId
                                 AND f.followingId = r.userId
                                 AND f.status = com.moing.backend.domain.follow.entity.FollowStatus.ACCEPTED))
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             ORDER BY r.id DESC
             """)
     List<Review> findArchivedReviews(
@@ -156,7 +210,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 인기 장소: 복수 장소의 72h 이내 노출 가능한 리뷰 (장소별 최신 순)
     // 리뷰 수·최신 리뷰·대표 사진을 이 한 번의 조회로 모두 뽑는다.
-    // 조건은 PlaceRepository.findHotPlaces의 카운트 조건과 반드시 같아야 한다.
+    // 조건은 PlaceRepository.findHotPlaces의 카운트 조건과 반드시 같아야 한다 (차단 필터까지).
     @Query("""
             SELECT r FROM Review r
             WHERE r.placeId IN :placeIds
@@ -164,14 +218,21 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
               AND r.isBlinded = false
               AND (r.visibility IS NULL
                    OR r.visibility <> com.moing.backend.domain.review.entity.Visibility.FRIENDS)
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = r.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = r.userId AND b2.blockedId = :viewerId)
             ORDER BY r.createdAt DESC, r.id DESC
             """)
     List<Review> findVisibleRecentReviewsByPlaceIds(
             @Param("placeIds") List<Long> placeIds,
-            @Param("since") LocalDateTime since);
+            @Param("since") LocalDateTime since,
+            @Param("viewerId") Long viewerId);
 
     // 친구 피드: 친구들이 72h 이내 쓴 리뷰 (최신순)
-    // 이미 수락된 친구만 대상이므로 친구 공개(FRIENDS) 리뷰도 걸러내지 않는다
+    // 이미 수락된 친구만 대상이므로 친구 공개(FRIENDS) 리뷰도 걸러내지 않는다.
+    // 차단하면 친구 관계가 함께 지워지므로 차단된 작성자는 userIds에 올 수 없지만,
+    // 호출부가 차단 상대를 조회 전에 한 번 더 빼낸다 (FollowService.getFriendFeed 참고)
     @Query("""
             SELECT r FROM Review r
             WHERE r.userId IN :userIds
@@ -315,6 +376,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                               WHERE f.follower_id = :viewerId
                                 AND f.following_id = r.user_id
                                 AND f.status = 'ACCEPTED'))
+              AND NOT EXISTS (SELECT 1 FROM blocks b
+                              WHERE b.blocker_id = :viewerId AND b.blocked_id = r.user_id)
+              AND NOT EXISTS (SELECT 1 FROM blocks b2
+                              WHERE b2.blocker_id = r.user_id AND b2.blocked_id = :viewerId)
               AND (6371000 * acos(
                     GREATEST(-1.0, LEAST(1.0,
                       cos(radians(:lat)) * cos(radians(r.latitude))

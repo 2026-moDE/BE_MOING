@@ -74,26 +74,29 @@ public class PlaceController {
     }
 
     // 장소 검색 (filter: all | current | archived, 기본값 all)
+    // 대표 사진에서 차단 관계가 있는 작성자의 리뷰를 빼야 해서 조회자가 필요하다
     @GetMapping("/nearby")
     public ResponseEntity<PlaceNearbyResponse> getNearbyPlaces(
+            @AuthenticationPrincipal Long userId,
             @RequestParam double latitude,
             @RequestParam double longitude,
             @RequestParam(required = false) Integer radius,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "all") String filter
     ) {
-        return ResponseEntity.ok(placeService.getNearbyPlaces(latitude, longitude, radius, query, filter));
+        return ResponseEntity.ok(placeService.getNearbyPlaces(userId, latitude, longitude, radius, query, filter));
     }
 
     // 인기 장소 (72h 이내 리뷰 2개 이상, 현재 위치에서 가까운 순)
     @GetMapping("/hot")
     public ResponseEntity<ApiResponse<HotPlaceResponse>> getHotPlaces(
+            @AuthenticationPrincipal Long userId,
             @RequestParam double latitude,
             @RequestParam double longitude,
             @RequestParam(defaultValue = "5") int limit
     ) {
         return ResponseEntity.ok(ApiResponse.success("success",
-                placeService.getHotPlaces(latitude, longitude, limit)));
+                placeService.getHotPlaces(userId, latitude, longitude, limit)));
     }
 
     // 좌표의 행정동 조회 (현재 위치 표시용)
@@ -110,12 +113,13 @@ public class PlaceController {
     // keyword 없으면 좌표 기준 주변 장소, 좌표도 없으면 빈 배열
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<PlaceNearbyResponse>> searchPlaces(
+            @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                placeService.searchPlaces(keyword, latitude, longitude)));
+                placeService.searchPlaces(userId, keyword, latitude, longitude)));
     }
 
     @PostMapping("/{id}/subscribe")

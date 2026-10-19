@@ -13,50 +13,87 @@ import java.util.stream.Collectors;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    // 최상위 댓글 커서 기반 조회 (오래된 순)
+    /**
+     * 최상위 댓글 커서 기반 조회 (오래된 순).
+     *
+     * <p>차단 관계가 있는 작성자의 댓글은 양방향으로 숨긴다 — 내가 차단한 사람의 댓글도,
+     * 나를 차단한 사람의 댓글도 안 보인다. 거르는 자리가 쿼리인 이유는 커서 페이징이다.
+     * 받아온 뒤 빼면 차단된 댓글이 limit 자리를 차지해 페이지가 비어 보이고,
+     * 커서가 그만큼 건너뛴다.
+     */
     @Query("""
             SELECT c FROM Comment c
             WHERE c.reviewId = :reviewId
               AND c.parentId IS NULL
               AND (:cursor IS NULL OR c.id > :cursor)
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = c.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = c.userId AND b2.blockedId = :viewerId)
             ORDER BY c.id ASC
             """)
     List<Comment> findTopLevelComments(
             @Param("reviewId") Long reviewId,
             @Param("cursor") Long cursor,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
     // 조회된 댓글들의 답글 일괄 조회 (N+1 방지)
+    // 답글도 최상위 댓글과 같은 기준으로 차단 작성자를 숨긴다
     @Query("""
             SELECT c FROM Comment c
             WHERE c.parentId IN :parentIds
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = c.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = c.userId AND b2.blockedId = :viewerId)
             ORDER BY c.id ASC
             """)
-    List<Comment> findRepliesByParentIds(@Param("parentIds") List<Long> parentIds);
+    List<Comment> findRepliesByParentIds(@Param("parentIds") List<Long> parentIds,
+                                         @Param("viewerId") Long viewerId);
 
     // 답글 존재 여부 (삭제 방식 결정용, 소프트 삭제된 답글도 부모를 붙들고 있으므로 포함한다)
     boolean existsByParentId(Long parentId);
 
-    // 리뷰 한 건의 댓글 수 (답글과 자리표시로 남은 삭제 댓글 포함)
-    long countByReviewId(Long reviewId);
+    /**
+     * 리뷰 한 건의 댓글 수 (답글과 자리표시로 남은 삭제 댓글 포함).
+     *
+     * <p>차단된 작성자의 댓글은 세지 않는다. 목록 조회가 그 댓글을 숨기므로, 세는 쪽에서
+     * 함께 빼지 않으면 "댓글 3개"를 눌렀는데 1개만 보이는 화면이 된다.
+     */
+    @Query("""
+            SELECT COUNT(c) FROM Comment c
+            WHERE c.reviewId = :reviewId
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = c.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = c.userId AND b2.blockedId = :viewerId)
+            """)
+    long countByReviewId(@Param("reviewId") Long reviewId, @Param("viewerId") Long viewerId);
 
     // 리뷰별 댓글 수 (답글 포함).
-    // 자리표시로 남은 삭제 댓글도 목록에 그대로 보이므로 함께 센다
+    // 자리표시로 남은 삭제 댓글도 목록에 그대로 보이므로 함께 센다.
+    // 차단된 작성자의 댓글을 빼는 기준은 countByReviewId와 같다
     @Query("""
             SELECT c.reviewId, COUNT(c)
             FROM Comment c
             WHERE c.reviewId IN :reviewIds
+              AND NOT EXISTS (SELECT b.id FROM Block b
+                              WHERE b.blockerId = :viewerId AND b.blockedId = c.userId)
+              AND NOT EXISTS (SELECT b2.id FROM Block b2
+                              WHERE b2.blockerId = c.userId AND b2.blockedId = :viewerId)
             GROUP BY c.reviewId
             """)
-    List<Object[]> countByReviewIds(@Param("reviewIds") List<Long> reviewIds);
+    List<Object[]> countByReviewIds(@Param("reviewIds") List<Long> reviewIds,
+                                    @Param("viewerId") Long viewerId);
 
     // 리뷰 목록의 댓글 수를 한 번에 조회한다 (리뷰마다 count를 날리지 않기 위해).
     // 댓글이 하나도 없는 리뷰는 키가 없으므로 호출부에서 0으로 채운다
-    default Map<Long, Long> countMapByReviewIds(List<Long> reviewIds) {
+    default Map<Long, Long> countMapByReviewIds(List<Long> reviewIds, Long viewerId) {
         if (reviewIds.isEmpty()) {
             return Map.of();
         }
-        return countByReviewIds(reviewIds).stream()
+        return countByReviewIds(reviewIds, viewerId).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
     }
 

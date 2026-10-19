@@ -56,7 +56,7 @@ public class SearchService {
             if (latitude == null || longitude == null) {
                 throw new CustomException(ErrorCode.INVALID_INPUT);
             }
-            return nearbyFromDb(latitude, longitude, radius, since);
+            return nearbyFromDb(userId, latitude, longitude, radius, since);
         }
 
         List<PlaceSearchResponse.PlaceItem> items;
@@ -71,7 +71,7 @@ public class SearchService {
             items = List.of();
         } else {
             items = kakaoResult.documents().stream()
-                    .map(doc -> buildSearchItem(doc, since))
+                    .map(doc -> buildSearchItem(userId, doc, since))
                     .toList();
         }
 
@@ -151,19 +151,19 @@ public class SearchService {
      * 좌표 기준 주변 장소를 DB에서 조회한다 (거리 오름차순).
      * 카카오를 거치지 않으므로 이미 적재된 장소만 나온다.
      */
-    private PlaceSearchResponse nearbyFromDb(double latitude, double longitude, Integer radius, LocalDateTime since) {
+    private PlaceSearchResponse nearbyFromDb(Long userId, double latitude, double longitude, Integer radius, LocalDateTime since) {
         int effectiveRadius = radius != null ? radius : DEFAULT_NEARBY_RADIUS_METERS;
 
         List<PlaceSearchResponse.PlaceItem> items = placeRepository
                 .findNearbyAll(latitude, longitude, effectiveRadius)
                 .stream()
-                .map(place -> toSearchItem(place, since))
+                .map(place -> toSearchItem(userId, place, since))
                 .toList();
 
         return new PlaceSearchResponse(items);
     }
 
-    private PlaceSearchResponse.PlaceItem buildSearchItem(KakaoLocalResponse.Document doc, LocalDateTime since) {
+    private PlaceSearchResponse.PlaceItem buildSearchItem(Long userId, KakaoLocalResponse.Document doc, LocalDateTime since) {
         String name = doc.placeName();
         String address = doc.roadAddressName() != null ? doc.roadAddressName() : doc.addressName();
         PlaceCategory category = PlaceCategory.fromKakaoCategoryCode(doc.categoryGroupCode());
@@ -173,7 +173,7 @@ public class SearchService {
         // DB에 있으면 혼잡도·썸네일 포함, 없으면 upsert 후 반환
         Optional<Place> existing = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(name);
         if (existing.isPresent()) {
-            return toSearchItem(existing.get(), since);
+            return toSearchItem(userId, existing.get(), since);
         }
 
         BigDecimal latitude = new BigDecimal(doc.y());
@@ -191,14 +191,14 @@ public class SearchService {
         return new PlaceSearchResponse.PlaceItem(saved.getId(), name, address, category, lat, lng, null, null, null);
     }
 
-    private PlaceSearchResponse.PlaceItem toSearchItem(Place place, LocalDateTime since) {
+    private PlaceSearchResponse.PlaceItem toSearchItem(Long userId, Place place, LocalDateTime since) {
         var congestionLevel = reviewRepository
                 .findTopByPlaceIdAndIsBlindedFalseAndCreatedAtAfterOrderByCreatedAtDesc(place.getId(), since)
                 .map(Review::getCongestionLevel)
                 .orElse(null);
 
         var topReview = reviewRepository
-                .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                .findTopWithImageByPlaceId(place.getId(), since, userId, PageRequest.of(0, 1))
                 .stream().findFirst();
 
         return new PlaceSearchResponse.PlaceItem(

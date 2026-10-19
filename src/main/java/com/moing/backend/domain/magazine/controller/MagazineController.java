@@ -36,7 +36,7 @@ public class MagazineController {
             @RequestParam(required = false) Integer limit
     ) {
         return ResponseEntity.ok(ApiResponse.success("success",
-                magazineService.getMagazines(latitude, longitude, limit)));
+                magazineService.getMagazines(userId, latitude, longitude, limit)));
     }
 
     /**
@@ -52,6 +52,6 @@ public class MagazineController {
             @RequestParam(required = false) Double longitude
     ) {
         return ResponseEntity.ok(ApiResponse.success("success",
-                magazineService.getMagazineDetail(id, latitude, longitude)));
+                magazineService.getMagazineDetail(userId, id, latitude, longitude)));
     }
 }

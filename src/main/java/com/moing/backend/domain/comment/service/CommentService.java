@@ -1,5 +1,6 @@
 package com.moing.backend.domain.comment.service;
 
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.comment.dto.CommentCreateRequest;
 import com.moing.backend.domain.comment.dto.CommentCreateResponse;
 import com.moing.backend.domain.comment.dto.CommentListResponse;
@@ -39,11 +40,13 @@ public class CommentService {
     private final FollowRepository followRepository;
     private final PlaceRepository placeRepository;
     private final NotificationService notificationService;
+    private final BlockService blockService;
 
     // 댓글 작성 (비밀 댓글은 친구 공개 리뷰에서만 가능)
     @Transactional
     public CommentCreateResponse createComment(Long userId, Long reviewId, CommentCreateRequest request) {
         Review review = getReview(reviewId);
+        blockService.validateNotBlocked(userId, review.getUserId());
         validateAccess(userId, review);
 
         boolean isSecret = request.isSecret() != null && request.isSecret();
@@ -70,6 +73,7 @@ public class CommentService {
     @Transactional
     public CommentCreateResponse createReply(Long userId, Long reviewId, Long commentId, ReplyCreateRequest request) {
         Review review = getReview(reviewId);
+        blockService.validateNotBlocked(userId, review.getUserId());
         validateAccess(userId, review);
 
         Comment parent = commentRepository.findById(commentId)
@@ -79,6 +83,9 @@ public class CommentService {
         if (!parent.getReviewId().equals(reviewId)) {
             throw new CustomException(ErrorCode.COMMENT_NOT_FOUND);
         }
+        // 리뷰 작성자와 별개로 댓글 작성자와의 차단도 막는다.
+        // 차단한 상대의 댓글은 목록에서 안 보이지만 id를 알면 답글을 달 수 있다
+        blockService.validateNotBlocked(userId, parent.getUserId());
         if (parent.isReply()) {
             throw new CustomException(ErrorCode.NESTED_REPLY_NOT_ALLOWED);
         }
@@ -166,15 +173,15 @@ public class CommentService {
         validateAccess(userId, review);
 
         List<Comment> fetched = commentRepository.findTopLevelComments(
-                reviewId, cursor, PageRequest.of(0, limit + 1));
+                reviewId, cursor, userId, PageRequest.of(0, limit + 1));
         boolean hasNext = fetched.size() > limit;
         List<Comment> page = hasNext ? fetched.subList(0, limit) : fetched;
 
-        // 답글은 공개 범위와 무관하게 함께 내려준다
+        // 답글은 공개 범위와 무관하게 함께 내려주되, 차단된 작성자의 답글은 빠진다
         Map<Long, List<Comment>> repliesByParent = Map.of();
         if (!page.isEmpty()) {
             List<Long> parentIds = page.stream().map(Comment::getId).toList();
-            repliesByParent = commentRepository.findRepliesByParentIds(parentIds).stream()
+            repliesByParent = commentRepository.findRepliesByParentIds(parentIds, userId).stream()
                     .collect(Collectors.groupingBy(Comment::getParentId));
         }
 

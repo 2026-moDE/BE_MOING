@@ -1,7 +1,6 @@
 package com.moing.backend.domain.piece.service;
 
-import com.moing.backend.domain.follow.entity.FollowStatus;
-import com.moing.backend.domain.follow.repository.FollowRepository;
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.piece.dto.PieceCreateRequest;
 import com.moing.backend.domain.piece.dto.PieceCreateResponse;
 import com.moing.backend.domain.piece.dto.PieceListResponse;
@@ -53,7 +52,7 @@ public class PieceService {
     private final ReviewRepository reviewRepository;
     private final PlaceRepository placeRepository;
     private final UserRepository userRepository;
-    private final FollowRepository followRepository;
+    private final BlockService blockService;
 
     /**
      * 조각 등록.
@@ -91,19 +90,22 @@ public class PieceService {
     }
 
     /**
-     * 친구 조각 목록.
+     * 타인 조각 목록.
      *
-     * <p>전체 공개 조각만 실리고 visibility는 응답에서 빠진다. 친구가 아니면 FORBIDDEN이다.
-     * 자기 id로 조회하는 경우는 친구 관계가 없어도 통과시킨다 (타인 리뷰 조회와 같은 규칙).
+     * <p>전체 공개 조각만 실리고 visibility는 응답에서 빠진다.
+     *
+     * <p>친구 여부를 따지지 않는다 — 접근을 가르는 값은 조각 자신의 공개 범위다.
+     * PRIVATE 조각은 누구에게도 안 보이고, PUBLIC 조각은 누구에게나 보인다.
+     * 친구 관계를 한 겹 더 두면 "전체 공개로 올렸는데 친구만 본다"가 되어 두 척도가 겹친다.
+     *
+     * <p>차단 관계가 있으면 403이다 (타인 프로필·리뷰 목록과 같은 규칙).
      */
     public PieceListResponse getUserPieces(Long viewerId, Long targetUserId) {
         if (!userRepository.existsById(targetUserId)) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
 
-        if (!viewerId.equals(targetUserId) && !isFriend(viewerId, targetUserId)) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
+        blockService.validateNotBlocked(viewerId, targetUserId);
 
         return toListResponse(
                 pieceRepository.findByUserIdAndVisibility(targetUserId, PieceVisibility.PUBLIC), false);
@@ -174,12 +176,6 @@ public class PieceService {
         }
 
         return piece;
-    }
-
-    // 서로 친구(ACCEPTED)인지 확인
-    private boolean isFriend(Long userId, Long targetUserId) {
-        return followRepository.existsByFollowerIdAndFollowingIdAndStatusIn(
-                userId, targetUserId, List.of(FollowStatus.ACCEPTED));
     }
 
     // 빈 문자열은 null로 정규화 (이름 제거로 동작)

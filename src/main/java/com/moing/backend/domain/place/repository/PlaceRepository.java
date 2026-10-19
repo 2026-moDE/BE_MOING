@@ -145,6 +145,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
      *
      * 리뷰 조건은 ReviewRepository.findVisibleRecentReviewsByPlaceIds와 반드시 같아야 한다.
      * 어긋나면 노출 기준 개수와 응답의 review_count가 서로 달라진다.
+     * 차단 필터도 그래서 여기 들어간다 — 차단으로 리뷰가 빠져 기준에 못 미치는 장소는
+     * 인기 장소에 올라오지 않아야 응답의 review_count와 노출 기준이 맞는다.
      */
     @Query(value = """
             SELECT * FROM places p
@@ -155,6 +157,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
                   AND r.created_at > :since
                   AND r.is_blinded = false
                   AND (r.visibility IS NULL OR r.visibility <> 'FRIENDS')
+                  AND NOT EXISTS (SELECT 1 FROM blocks b
+                                  WHERE b.blocker_id = :viewerId AND b.blocked_id = r.user_id)
+                  AND NOT EXISTS (SELECT 1 FROM blocks b2
+                                  WHERE b2.blocker_id = r.user_id AND b2.blocked_id = :viewerId)
               ) >= :minReviews
             ORDER BY (6371000 * acos(
                     GREATEST(-1.0, LEAST(1.0,
@@ -169,6 +175,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             @Param("lng") double lng,
             @Param("since") LocalDateTime since,
             @Param("minReviews") int minReviews,
+            @Param("viewerId") Long viewerId,
             Pageable pageable);
 
     /** keyword가 name 또는 address에 포함된 활성 장소를 조회한다 */

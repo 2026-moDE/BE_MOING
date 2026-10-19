@@ -29,6 +29,12 @@ public enum ErrorCode {
     // --- 유저 조회 관련 ---
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),
 
+    // --- 사용자 차단 관련 ---
+    CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신을 차단할 수 없습니다"),
+    // 차단 관계가 있는 상대에게는 404가 아니라 403을 준다.
+    // 404로 두면 탈퇴한 사용자와 구분이 안 되어 클라이언트가 화면을 가를 수 없다
+    USER_ACCESS_DENIED(HttpStatus.FORBIDDEN, "차단한 사용자이거나 나를 차단한 사용자입니다"),
+
     // --- 친구 관련 ---
     SELF_FOLLOW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신에게 친구 요청을 보낼 수 없습니다"),
     ALREADY_FOLLOWING(HttpStatus.CONFLICT, "이미 친구 요청 중이거나 친구 상태입니다"),

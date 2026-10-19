@@ -1,5 +1,6 @@
 package com.moing.backend.domain.reaction.service;
 
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.follow.entity.FollowStatus;
 import com.moing.backend.domain.follow.repository.FollowRepository;
 import com.moing.backend.domain.notification.entity.NotificationType;
@@ -37,6 +38,7 @@ public class ReactionService {
     private final UserRepository userRepository;
     private final PlaceRepository placeRepository;
     private final NotificationService notificationService;
+    private final BlockService blockService;
 
     // 이모지 반응 추가 (리뷰당 하나만 가능, 다른 이모지를 누르면 교체)
     // 자기 리뷰에는 남길 수 없고 목록 조회만 가능하다
@@ -46,6 +48,7 @@ public class ReactionService {
         if (userId.equals(review.getUserId())) {
             throw new CustomException(ErrorCode.SELF_REACTION_NOT_ALLOWED);
         }
+        blockService.validateNotBlocked(userId, review.getUserId());
         validateAccess(userId, review);
 
         String emoji = request.emoji();

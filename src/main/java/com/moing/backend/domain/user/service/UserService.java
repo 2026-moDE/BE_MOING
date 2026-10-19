@@ -1,5 +1,6 @@
 package com.moing.backend.domain.user.service;
 
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.follow.entity.Follow;
 import com.moing.backend.domain.follow.entity.FollowStatus;
@@ -58,6 +59,7 @@ public class UserService {
     private final FollowRepository followRepository;
     private final CommentRepository commentRepository;
     private final PieceRepository pieceRepository;
+    private final BlockService blockService;
 
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -93,10 +95,15 @@ public class UserService {
      *
      * <p>review_count는 미리보기 수가 아니라 보이는 리뷰 전체 개수라, 프론트가 이 값으로
      * "더보기"를 띄울지 판단할 수 있다.
+     *
+     * <p>차단 관계가 있으면 403({@code USER_ACCESS_DENIED})이다. 404로 두면 탈퇴한 사용자와
+     * 구분이 안 되어, 클라이언트가 "차단 중"과 "없는 계정"을 다르게 보여줄 수 없다.
      */
     public UserPublicProfileResponse getUserProfile(Long viewerId, Long targetUserId) {
         User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        blockService.validateNotBlocked(viewerId, targetUserId);
 
         FollowStatus relation = followRepository.findByFollowerIdAndFollowingId(viewerId, targetUserId)
                 .map(Follow::getStatus)
@@ -121,7 +128,7 @@ public class UserService {
                 reviewRepository.countUserVisibleReviews(targetUserId, visibilities),
                 isFriend,
                 friendStatus,
-                toReviewItems(reviews, fullAccess)
+                toReviewItems(viewerId, reviews, fullAccess)
         );
     }
 
@@ -133,6 +140,9 @@ public class UserService {
     public UserReviewListResponse getUserReviews(Long viewerId, Long targetUserId, Long cursor, int limit) {
         userRepository.findById(targetUserId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 프로필과 같은 기준으로 막는다. 목록만 열려 있으면 프로필을 건너뛰고 리뷰를 볼 수 있다
+        blockService.validateNotBlocked(viewerId, targetUserId);
 
         boolean isFriend = followRepository.findByFollowerIdAndFollowingId(viewerId, targetUserId)
                 .map(f -> f.getStatus() == FollowStatus.ACCEPTED)
@@ -147,7 +157,7 @@ public class UserService {
         List<Review> page = hasNext ? reviews.subList(0, safeLimit) : reviews;
         Long nextCursor = hasNext ? page.get(page.size() - 1).getId() : null;
 
-        return new UserReviewListResponse(toReviewItems(page, fullAccess), nextCursor);
+        return new UserReviewListResponse(toReviewItems(viewerId, page, fullAccess), nextCursor);
     }
 
     // 자기 id로 조회하는 경우도 있어(친구 관계가 아니므로) 본인은 따로 통과시킨다
@@ -168,7 +178,7 @@ public class UserService {
                 : List.of(Visibility.PUBLIC);
     }
 
-    private List<UserReviewItem> toReviewItems(List<Review> reviews, boolean fullAccess) {
+    private List<UserReviewItem> toReviewItems(Long viewerId, List<Review> reviews, boolean fullAccess) {
         if (reviews.isEmpty()) {
             return List.of();
         }
@@ -179,7 +189,7 @@ public class UserService {
                 .collect(Collectors.toMap(Place::getId, Function.identity()));
 
         Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
-                reviews.stream().map(Review::getId).toList());
+                reviews.stream().map(Review::getId).toList(), viewerId);
 
         LocalDateTime recentSince = LocalDateTime.now().minusHours(RECENT_HOURS);
 
@@ -216,7 +226,7 @@ public class UserService {
                 .collect(Collectors.toMap(Place::getId, Function.identity()));
 
         Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
-                page.stream().map(Review::getId).toList());
+                page.stream().map(Review::getId).toList(), userId);
 
         List<MyReviewListResponse.MyReviewItem> items = page.stream().map(r -> {
             Place place = placeMap.get(r.getPlaceId());
@@ -315,7 +325,7 @@ public class UserService {
         List<SubscriptionListResponse.SubscriptionItem> items = subscriptions.stream().map(s -> {
             Place place = placeMap.get(s.getPlaceId());
             var topReview = reviewRepository
-                    .findTopWithImageAllTimeByPlaceId(s.getPlaceId(), PageRequest.of(0, 1))
+                    .findTopWithImageAllTimeByPlaceId(s.getPlaceId(), userId, PageRequest.of(0, 1))
                     .stream().findFirst();
             // 썸네일이 없는 옛 이미지(original/ 폴더 밖 업로드)는 원본으로 폴백
             String thumbnail = topReview

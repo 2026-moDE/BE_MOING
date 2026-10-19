@@ -1,5 +1,6 @@
 package com.moing.backend.domain.magazine.service;
 
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.congestion.dto.CongestionResponse;
 import com.moing.backend.domain.congestion.service.CongestionService;
 import com.moing.backend.domain.magazine.dto.MagazineDetailResponse;
@@ -31,6 +32,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -62,6 +64,7 @@ public class MagazineService {
     private final PlaceRepository placeRepository;
     private final UserRepository userRepository;
     private final CongestionService congestionService;
+    private final BlockService blockService;
     private final Clock clock;
 
     /**
@@ -69,7 +72,7 @@ public class MagazineService {
      *
      * <p>priority 높은 순, 같으면 아이템 많은 순이다.
      */
-    public MagazineListResponse getMagazines(Double latitude, Double longitude, Integer limit) {
+    public MagazineListResponse getMagazines(Long userId, Double latitude, Double longitude, Integer limit) {
         if (latitude == null || longitude == null) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
@@ -94,7 +97,7 @@ public class MagazineService {
                 .stream()
                 .collect(Collectors.groupingBy(MagazineItem::getMagazineId));
 
-        Map<Long, Review> reviewMap = loadVisibleReviews(itemsByMagazine.values().stream()
+        Map<Long, Review> reviewMap = loadVisibleReviews(userId, itemsByMagazine.values().stream()
                 .flatMap(List::stream)
                 .map(MagazineItem::getReviewId)
                 .distinct()
@@ -140,17 +143,17 @@ public class MagazineService {
      * @param latitude  없으면 distance를 null로 둔다
      * @throws CustomException 묶음이 없거나 남은 리뷰가 하나도 없으면 404
      */
-    public MagazineDetailResponse getMagazineDetail(Long magazineId, Double latitude, Double longitude) {
+    public MagazineDetailResponse getMagazineDetail(Long userId, Long magazineId, Double latitude, Double longitude) {
         Magazine magazine = magazineRepository.findById(magazineId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MAGAZINE_NOT_FOUND));
 
         List<MagazineItem> items = magazineItemRepository
                 .findByMagazineIdOrderBySortOrderAsc(magazineId);
 
-        Map<Long, Review> reviewMap = loadVisibleReviews(
+        Map<Long, Review> reviewMap = loadVisibleReviews(userId,
                 items.stream().map(MagazineItem::getReviewId).toList());
 
-        // 배치 이후 지워지거나 블라인드된 리뷰는 빠진다
+        // 배치 이후 지워지거나 블라인드된 리뷰, 차단한 작성자의 리뷰는 빠진다
         List<Review> reviews = items.stream()
                 .map(item -> reviewMap.get(item.getReviewId()))
                 .filter(Objects::nonNull)
@@ -181,14 +184,20 @@ public class MagazineService {
      * <p>지워진 리뷰는 조회 결과에서 빠지고, 블라인드된 리뷰는 여기서 걸러낸다.
      * 친구 공개 리뷰는 배치가 이미 제외하지만, 매거진은 불특정 사용자에게 노출되므로
      * 읽는 쪽에서도 한 번 더 막는다.
+     *
+     * <p>차단은 조회자별로 갈리므로 배치가 미리 걸러둘 수 없고 여기서만 걸러진다.
+     * 묶음은 아이템이 많아도 수십 건이라 메모리에서 빼도 된다 — 커서로 넘기는 목록과 달리
+     * 몇 건이 빠져도 "다음 페이지"가 어긋날 일이 없다.
      */
-    private Map<Long, Review> loadVisibleReviews(List<Long> reviewIds) {
+    private Map<Long, Review> loadVisibleReviews(Long viewerId, List<Long> reviewIds) {
         if (reviewIds.isEmpty()) {
             return Map.of();
         }
+        Set<Long> blockedIds = blockService.getRelatedUserIds(viewerId);
         return reviewRepository.findAllById(reviewIds).stream()
                 .filter(r -> !r.isBlinded())
                 .filter(r -> r.getVisibility() != Visibility.FRIENDS)
+                .filter(r -> !blockedIds.contains(r.getUserId()))
                 .collect(Collectors.toMap(Review::getId, Function.identity()));
     }
 

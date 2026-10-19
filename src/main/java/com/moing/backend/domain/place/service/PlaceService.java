@@ -78,13 +78,13 @@ public class PlaceService {
     // 주변 장소 조회 (카카오 검색 -> DB 매칭)
     // 카카오에만 있는 장소를 적재하므로 읽기 전용이 아니다
     @Transactional
-    public PlaceNearbyResponse getNearbyPlaces(double latitude, double longitude, Integer radius, String query, String filter) {
+    public PlaceNearbyResponse getNearbyPlaces(Long userId, double latitude, double longitude, Integer radius, String query, String filter) {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         // query 없으면 DB에서 장소 버블 반환 (filter에 따라 분기)
         // 지도 버블은 대표 사진이 있는 장소만 노출한다
         if (query == null || query.isBlank()) {
-            return nearbyFromDb(latitude, longitude, radius, filter, since, true);
+            return nearbyFromDb(userId, latitude, longitude, radius, filter, since, true);
         }
 
         KakaoLocalResponse kakaoResult = kakaoSearchService.search(query, longitude, latitude, radius);
@@ -94,7 +94,7 @@ public class PlaceService {
         }
 
         List<PlaceNearbyResponse.PlaceItem> items = kakaoResult.documents().stream()
-                .map(doc -> buildPlaceItemFromKakao(doc, filter, since))
+                .map(doc -> buildPlaceItemFromKakao(userId, doc, filter, since))
                 .toList();
 
         return new PlaceNearbyResponse(items);
@@ -106,13 +106,13 @@ public class PlaceService {
      * @param photoOnly true면 대표 사진이 있는 장소만 (지도 버블용).
      *                  검색 결과 목록에서는 사진 유무와 무관하게 모두 내려줘야 하므로 false.
      */
-    private PlaceNearbyResponse nearbyFromDb(double latitude, double longitude, Integer radius,
+    private PlaceNearbyResponse nearbyFromDb(Long userId, double latitude, double longitude, Integer radius,
                                              String filter, LocalDateTime since, boolean photoOnly) {
         List<Place> places = resolvePlaces(filter, latitude, longitude, radius, since);
         Map<Long, PlaceCongestionCache> cacheMap = loadCacheMap(places);
 
         Stream<PlaceNearbyResponse.PlaceItem> items = places.stream()
-                .map(place -> toItem(place, filter, since, cacheMap.get(place.getId())));
+                .map(place -> toItem(userId, place, filter, since, cacheMap.get(place.getId())));
         if (photoOnly) {
             items = items.filter(item -> item.thumbnailUrl() != null);
         }
@@ -136,13 +136,13 @@ public class PlaceService {
 
     // 카카오 검색 결과를 PlaceItem DTO로 변환
     private PlaceNearbyResponse.PlaceItem buildPlaceItemFromKakao(
-            KakaoLocalResponse.Document doc, String filter, LocalDateTime since) {
+            Long userId, KakaoLocalResponse.Document doc, String filter, LocalDateTime since) {
 
         Place place = placeRepository.findFirstByNameAndIsActiveTrueOrderByIdAsc(doc.placeName())
                 .orElseGet(() -> saveFromKakao(doc));
 
         PlaceCongestionCache cache = congestionCacheRepository.findById(place.getId()).orElse(null);
-        return toItem(place, filter, since, cache);
+        return toItem(userId, place, filter, since, cache);
     }
 
     /**
@@ -172,18 +172,19 @@ public class PlaceService {
     }
 
     // DB 엔티티를 응답 DTO로 변환 (filter에 따라 썸네일 조회 범위 결정)
-    private PlaceNearbyResponse.PlaceItem toItem(Place place, String filter, LocalDateTime since, PlaceCongestionCache cache) {
+    // 대표 사진은 차단 관계가 있는 작성자의 리뷰를 건너뛰고 그 다음 사진을 고른다
+    private PlaceNearbyResponse.PlaceItem toItem(Long userId, Place place, String filter, LocalDateTime since, PlaceCongestionCache cache) {
         CongestionLevel congestionLevel = cache != null ? cache.getCongestionLevel() : null;
 
         var topReview = switch (filter) {
             case "current" -> reviewRepository
-                    .findTopWithImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                    .findTopWithImageByPlaceId(place.getId(), since, userId, PageRequest.of(0, 1))
                     .stream().findFirst();
             case "archived" -> reviewRepository
-                    .findTopWithArchivedImageByPlaceId(place.getId(), since, PageRequest.of(0, 1))
+                    .findTopWithArchivedImageByPlaceId(place.getId(), since, userId, PageRequest.of(0, 1))
                     .stream().findFirst();
             default -> reviewRepository  // "all"
-                    .findTopWithImageAllTimeByPlaceId(place.getId(), PageRequest.of(0, 1))
+                    .findTopWithImageAllTimeByPlaceId(place.getId(), userId, PageRequest.of(0, 1))
                     .stream().findFirst();
         };
 
@@ -211,14 +212,14 @@ public class PlaceService {
      * </ul>
      */
     @Transactional
-    public PlaceNearbyResponse searchPlaces(String keyword, Double latitude, Double longitude) {
+    public PlaceNearbyResponse searchPlaces(Long userId, String keyword, Double latitude, Double longitude) {
         if (keyword == null || keyword.isBlank()) {
             // 좌표가 없으면 기준점이 없으므로 아무것도 내려주지 않는다
             if (latitude == null || longitude == null) {
                 return new PlaceNearbyResponse(List.of());
             }
             // 검색 목록은 사진 없는 장소도 포함한다
-            return nearbyFromDb(latitude, longitude, DEFAULT_NEARBY_RADIUS_METERS,
+            return nearbyFromDb(userId, latitude, longitude, DEFAULT_NEARBY_RADIUS_METERS,
                     "all", LocalDateTime.now().minusHours(72), false);
         }
 
@@ -236,7 +237,7 @@ public class PlaceService {
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<PlaceNearbyResponse.PlaceItem> items = kakaoResult.documents().stream()
-                .map(doc -> buildPlaceItemFromKakao(doc, "all", since))
+                .map(doc -> buildPlaceItemFromKakao(userId, doc, "all", since))
                 .toList();
 
         return new PlaceNearbyResponse(items);
@@ -246,14 +247,16 @@ public class PlaceService {
      * 인기 장소 조회
      * 72h 이내 리뷰가 {@value #HOT_PLACE_MIN_REVIEWS}개 이상인 장소를 현재 위치에서 가까운 순으로 반환한다.
      *
-     * 로그인 사용자 구분 없이 같은 목록을 내려주므로 친구 공개 리뷰는 집계에서 제외한다.
+     * 친구 여부로는 갈리지 않으므로 친구 공개 리뷰는 조회자를 따지지 않고 집계에서 제외한다.
+     * 차단은 다르다 — 차단 관계가 있는 작성자의 리뷰는 집계와 사진에서 모두 빠지므로
+     * 같은 좌표라도 조회자에 따라 목록이 달라질 수 있다.
      */
-    public HotPlaceResponse getHotPlaces(double latitude, double longitude, int limit) {
+    public HotPlaceResponse getHotPlaces(Long userId, double latitude, double longitude, int limit) {
         int size = Math.max(1, Math.min(limit, HOT_PLACE_MAX_LIMIT));
         LocalDateTime since = LocalDateTime.now().minusHours(72);
 
         List<Place> places = placeRepository.findHotPlaces(
-                latitude, longitude, since, HOT_PLACE_MIN_REVIEWS, PageRequest.of(0, size));
+                latitude, longitude, since, HOT_PLACE_MIN_REVIEWS, userId, PageRequest.of(0, size));
 
         if (places.isEmpty()) {
             return new HotPlaceResponse(List.of());
@@ -263,7 +266,8 @@ public class PlaceService {
 
         // 장소별 최신순 리뷰. groupingBy는 정렬 순서를 유지하므로 첫 원소가 최신 리뷰다.
         Map<Long, List<Review>> reviewsByPlace = reviewRepository
-                .findVisibleRecentReviewsByPlaceIds(places.stream().map(Place::getId).toList(), since)
+                .findVisibleRecentReviewsByPlaceIds(
+                        places.stream().map(Place::getId).toList(), since, userId)
                 .stream()
                 .collect(Collectors.groupingBy(Review::getPlaceId));
 

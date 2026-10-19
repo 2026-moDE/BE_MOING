@@ -1,5 +1,6 @@
 package com.moing.backend.domain.follow.service;
 
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.comment.repository.CommentRepository;
 import com.moing.backend.domain.follow.dto.FriendFeedResponse;
 import com.moing.backend.domain.follow.dto.FriendRequestResponse;
@@ -31,6 +32,7 @@ import com.moing.backend.domain.follow.util.ChosungUtil;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,6 +45,7 @@ public class FollowService {
     private final ReviewRepository reviewRepository;
     private final PlaceRepository placeRepository;
     private final CommentRepository commentRepository;
+    private final BlockService blockService;
 
     private static final int SEARCH_LIMIT = 20;
     private static final int FEED_MAX_LIMIT = 50;
@@ -55,6 +58,10 @@ public class FollowService {
 
         User target = userRepository.findById(followingId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 차단을 해제하면 다시 요청할 수 있다. 차단 해제가 친구 관계를 복구하지 않으므로
+        // 친구가 되려면 반드시 이 경로를 다시 지나야 한다
+        blockService.validateNotBlocked(followerId, followingId);
 
         var existing = followRepository.findByFollowerIdAndFollowingId(followerId, followingId);
         if (existing.isPresent()) {
@@ -185,8 +192,13 @@ public class FollowService {
             users = userRepository.findByNicknameContaining(nickname, limit);
         }
 
-        // 자기 자신 제외
-        users = users.stream().filter(u -> !u.getId().equals(userId)).toList();
+        // 자기 자신과 차단 관계에 있는 사용자 제외.
+        // 차단한 상대는 친구 요청을 보낼 수 없으므로 검색 결과에 남겨둘 이유가 없다
+        Set<Long> blockedIds = blockService.getRelatedUserIds(userId);
+        users = users.stream()
+                .filter(u -> !u.getId().equals(userId))
+                .filter(u -> !blockedIds.contains(u.getId()))
+                .toList();
 
         if (users.isEmpty()) {
             return List.of();
@@ -237,8 +249,16 @@ public class FollowService {
     public FriendFeedResponse getFriendFeed(Long userId, int limit) {
         int size = Math.max(1, Math.min(limit, FEED_MAX_LIMIT));
 
+        // 차단하면 친구 관계가 함께 지워지므로 여기 차단 상대가 남아 있을 일은 없다.
+        // 그래도 한 번 더 빼는 이유는 친구 관계가 차단보다 먼저 쌓인 데이터일 수 있기 때문이다.
+        // 탈퇴 유저와 같은 이유로 조회 전에 걸러낸다 — 뒤에서 거르면 limit을 차지한다
+        Set<Long> blockedIds = blockService.getRelatedUserIds(userId);
+
         List<Long> friendIds = followRepository.findByFollowerIdAndStatus(userId, FollowStatus.ACCEPTED)
-                .stream().map(Follow::getFollowingId).toList();
+                .stream()
+                .map(Follow::getFollowingId)
+                .filter(id -> !blockedIds.contains(id))
+                .toList();
         if (friendIds.isEmpty()) {
             return new FriendFeedResponse(List.of());
         }
@@ -266,7 +286,7 @@ public class FollowService {
                 .collect(Collectors.toMap(Place::getId, p -> p));
 
         Map<Long, Long> commentCountMap = commentRepository.countMapByReviewIds(
-                reviews.stream().map(Review::getId).toList());
+                reviews.stream().map(Review::getId).toList(), userId);
 
         List<FriendFeedResponse.ReviewItem> items = reviews.stream()
                 .map(r -> {

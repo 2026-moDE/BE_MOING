@@ -1,5 +1,6 @@
 package com.moing.backend.domain.magazine.service;
 
+import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.congestion.dto.CongestionResponse;
 import com.moing.backend.domain.congestion.service.CongestionService;
 import com.moing.backend.domain.magazine.dto.MagazineDetailResponse;
@@ -33,9 +34,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
@@ -49,6 +52,9 @@ import static org.mockito.Mockito.when;
  * <p>노출 조건이 시각과 날씨로 갈려서, 둘 다 고정해 놓고 검증한다.
  */
 class MagazineServiceTest {
+
+    /** 차단 관계가 없는 조회자 */
+    private static final long VIEWER_ID = 1L;
 
     private static final double LAT = 37.54297;
     private static final double LNG = 127.05660;
@@ -66,6 +72,7 @@ class MagazineServiceTest {
     private PlaceRepository placeRepository;
     private UserRepository userRepository;
     private CongestionService congestionService;
+    private BlockService blockService;
 
     @BeforeEach
     void setUp() {
@@ -75,6 +82,9 @@ class MagazineServiceTest {
         placeRepository = mock(PlaceRepository.class);
         userRepository = mock(UserRepository.class);
         congestionService = mock(CongestionService.class);
+        blockService = mock(BlockService.class);
+        // 차단이 없는 상태가 기본값이다. 차단을 보는 테스트가 따로 덮어쓴다
+        when(blockService.getRelatedUserIds(any())).thenReturn(Set.of());
     }
 
     /** @param kstHour 조회 시각(KST) — LATE_NIGHT 노출 조건이 본다 */
@@ -82,7 +92,7 @@ class MagazineServiceTest {
         Clock clock = Clock.fixed(
                 LocalDateTime.of(2026, 10, 13, kstHour, 0).atZone(KST).toInstant(), KST);
         return new MagazineService(magazineRepository, magazineItemRepository, reviewRepository,
-                placeRepository, userRepository, congestionService, clock);
+                placeRepository, userRepository, congestionService, blockService, clock);
     }
 
     private MagazineService service() {
@@ -99,7 +109,7 @@ class MagazineServiceTest {
         givenItems(item(7L, 101L, 0), item(7L, 102L, 1), item(7L, 103L, 2));
         givenReviews(review(101L, 1L), review(102L, 2L), review(103L, 3L));
 
-        List<MagazineListResponse.MagazineItem> cards = service().getMagazines(LAT, LNG, null).magazines();
+        List<MagazineListResponse.MagazineItem> cards = service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines();
 
         assertThat(cards).hasSize(1);
         assertThat(cards.get(0).id()).isEqualTo(7L);
@@ -117,7 +127,7 @@ class MagazineServiceTest {
         givenReviews(review(101L, 1L), review(102L, 2L), review(201L, 3L), review(202L, 4L));
         givenWeather("없음");
 
-        assertThat(service().getMagazines(LAT, LNG, null).magazines())
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines())
                 .extracting(MagazineListResponse.MagazineItem::id)
                 .containsExactly(1L);
     }
@@ -130,7 +140,7 @@ class MagazineServiceTest {
         givenReviews(review(201L, 3L), review(202L, 4L));
         givenWeather("비");
 
-        assertThat(service().getMagazines(LAT, LNG, null).magazines())
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines())
                 .extracting(MagazineListResponse.MagazineItem::id)
                 .containsExactly(2L);
     }
@@ -142,7 +152,7 @@ class MagazineServiceTest {
         when(congestionService.getNearbyWeather(anyDouble(), anyDouble())).thenReturn(null);
 
         // 맑은 날 "비 오는 날" 묶음이 뜨는 쪽이 더 어색하다
-        assertThat(service().getMagazines(LAT, LNG, null).magazines()).isEmpty();
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines()).isEmpty();
     }
 
     @Test
@@ -152,10 +162,10 @@ class MagazineServiceTest {
         givenItems(item(3L, 301L, 0), item(3L, 302L, 1));
         givenReviews(review(301L, 1L), review(302L, 2L));
 
-        assertThat(service(9).getMagazines(LAT, LNG, null).magazines()).isEmpty();
-        assertThat(service(19).getMagazines(LAT, LNG, null).magazines()).isEmpty();
-        assertThat(service(20).getMagazines(LAT, LNG, null).magazines()).hasSize(1);
-        assertThat(service(23).getMagazines(LAT, LNG, null).magazines()).hasSize(1);
+        assertThat(service(9).getMagazines(VIEWER_ID, LAT, LNG, null).magazines()).isEmpty();
+        assertThat(service(19).getMagazines(VIEWER_ID, LAT, LNG, null).magazines()).isEmpty();
+        assertThat(service(20).getMagazines(VIEWER_ID, LAT, LNG, null).magazines()).hasSize(1);
+        assertThat(service(23).getMagazines(VIEWER_ID, LAT, LNG, null).magazines()).hasSize(1);
     }
 
     @Test
@@ -165,7 +175,7 @@ class MagazineServiceTest {
         givenItems(item(1L, 101L, 0));
         givenReviews(review(101L, 1L));
 
-        service().getMagazines(LAT, LNG, null);
+        service().getMagazines(VIEWER_ID, LAT, LNG, null);
 
         verify(congestionService, never()).getNearbyWeather(anyDouble(), anyDouble());
     }
@@ -183,7 +193,7 @@ class MagazineServiceTest {
                 review(201L, 3L), review(202L, 4L), review(203L, 5L),
                 review(301L, 6L));
 
-        assertThat(service().getMagazines(LAT, LNG, null).magazines())
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines())
                 .extracting(MagazineListResponse.MagazineItem::id)
                 .containsExactly(3L, 2L, 1L);   // TODAY(50) → CROWDED 3개 → CROWDED 2개
     }
@@ -196,7 +206,7 @@ class MagazineServiceTest {
         givenReviews(blinded(review(101L, 1L)), blinded(review(102L, 2L)));
 
         // 열어도 404라 카드도 내리지 않는다
-        assertThat(service().getMagazines(LAT, LNG, null).magazines()).isEmpty();
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines()).isEmpty();
     }
 
     @Test
@@ -206,7 +216,7 @@ class MagazineServiceTest {
         givenItems(item(1L, 101L, 0), item(1L, 102L, 1), item(1L, 103L, 2));
         givenReviews(review(101L, 1L), blinded(review(102L, 2L)), review(103L, 3L));
 
-        assertThat(service().getMagazines(LAT, LNG, null).magazines().get(0).itemCount())
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, null).magazines().get(0).itemCount())
                 .isEqualTo(2);
     }
 
@@ -217,13 +227,13 @@ class MagazineServiceTest {
         givenItems(item(1L, 101L, 0), item(2L, 201L, 0));
         givenReviews(review(101L, 1L), review(201L, 2L));
 
-        assertThat(service().getMagazines(LAT, LNG, 1).magazines()).hasSize(1);
+        assertThat(service().getMagazines(VIEWER_ID, LAT, LNG, 1).magazines()).hasSize(1);
     }
 
     @Test
     @DisplayName("좌표가 없으면 400으로 끊는다")
     void 좌표가_없으면_400이다() {
-        assertThatThrownBy(() -> service().getMagazines(null, LNG, null))
+        assertThatThrownBy(() -> service().getMagazines(VIEWER_ID, null, LNG, null))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_INPUT);
@@ -240,7 +250,7 @@ class MagazineServiceTest {
         givenPlace(1L, "리볼리 성수");
         givenUser(1L, "커피조아");
 
-        MagazineDetailResponse response = service().getMagazineDetail(7L, LAT, LNG);
+        MagazineDetailResponse response = service().getMagazineDetail(VIEWER_ID, 7L, LAT, LNG);
 
         assertThat(response.id()).isEqualTo(7L);
         assertThat(response.title()).isEqualTo("지금 한산한 카페");
@@ -265,7 +275,7 @@ class MagazineServiceTest {
         givenUser(1L, "커피조아");
 
         // 0으로 두면 "바로 옆"과 구분이 안 된다
-        assertThat(service().getMagazineDetail(7L, null, null).items().get(0).distance()).isNull();
+        assertThat(service().getMagazineDetail(VIEWER_ID, 7L, null, null).items().get(0).distance()).isNull();
     }
 
     @Test
@@ -277,7 +287,7 @@ class MagazineServiceTest {
         givenPlace(1L, "리볼리 성수");
         givenUser(1L, "커피조아");
 
-        assertThat(service().getMagazineDetail(7L, LAT, LNG).items())
+        assertThat(service().getMagazineDetail(VIEWER_ID, 7L, LAT, LNG).items())
                 .extracting(MagazineDetailResponse.Item::reviewId)
                 .containsExactly(101L, 103L);
     }
@@ -291,7 +301,7 @@ class MagazineServiceTest {
         givenPlace(1L, "리볼리 성수");
         givenUser(1L, "커피조아");
 
-        assertThat(service().getMagazineDetail(7L, LAT, LNG).items())
+        assertThat(service().getMagazineDetail(VIEWER_ID, 7L, LAT, LNG).items())
                 .extracting(MagazineDetailResponse.Item::reviewId)
                 .containsExactly(101L);
     }
@@ -306,7 +316,7 @@ class MagazineServiceTest {
         givenUser(1L, "커피조아");
 
         // 매거진은 불특정 사용자에게 노출되므로 읽는 쪽에서도 막는다
-        assertThat(service().getMagazineDetail(7L, LAT, LNG).items())
+        assertThat(service().getMagazineDetail(VIEWER_ID, 7L, LAT, LNG).items())
                 .extracting(MagazineDetailResponse.Item::reviewId)
                 .containsExactly(101L);
     }
@@ -318,7 +328,7 @@ class MagazineServiceTest {
         givenDetailItems(7L, item(7L, 101L, 0), item(7L, 102L, 1));
         givenReviews(blinded(review(101L, 1L)), blinded(review(102L, 2L)));
 
-        assertThatThrownBy(() -> service().getMagazineDetail(7L, LAT, LNG))
+        assertThatThrownBy(() -> service().getMagazineDetail(VIEWER_ID, 7L, LAT, LNG))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.MAGAZINE_NOT_FOUND);
@@ -329,7 +339,7 @@ class MagazineServiceTest {
     void 없는_묶음은_404다() {
         when(magazineRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service().getMagazineDetail(99L, LAT, LNG))
+        assertThatThrownBy(() -> service().getMagazineDetail(VIEWER_ID, 99L, LAT, LNG))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.MAGAZINE_NOT_FOUND);
@@ -344,7 +354,7 @@ class MagazineServiceTest {
         when(placeRepository.findAllById(anyList())).thenReturn(List.of());
         when(userRepository.findAllById(anyList())).thenReturn(List.of());
 
-        MagazineDetailResponse.Item item = service().getMagazineDetail(7L, LAT, LNG).items().get(0);
+        MagazineDetailResponse.Item item = service().getMagazineDetail(VIEWER_ID, 7L, LAT, LNG).items().get(0);
 
         assertThat(item.place().id()).isEqualTo(1L);
         assertThat(item.place().name()).isNull();

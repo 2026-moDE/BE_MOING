@@ -23,6 +23,10 @@ import java.time.LocalDateTime;
  *
  * <p>목록에 내려가는 created_at은 이 엔티티의 created_at(조각을 만든 시각)이 아니라
  * 원본 리뷰의 created_at이다. 사용자에게 조각은 "그때 다녀온 기록"이기 때문이다.
+ *
+ * <p>pin_order는 보드에 계속 붙여두는 "고정" 슬롯의 순서다. null이면 미고정이고,
+ * is_pinned는 컬럼 없이 이 값으로 계산한다. 고정은 공개 범위와 무관해서 PRIVATE 조각도
+ * 고정할 수 있다 — 남에게 보일지는 visibility가, 내 보드에 남길지는 이 값이 가른다.
  */
 @Entity
 @Table(name = "pieces",
@@ -35,6 +39,9 @@ public class Piece {
 
     /** 배율 기본값. 등록 직후와 scale 도입 이전 조각이 모두 이 값이다 */
     public static final BigDecimal DEFAULT_SCALE = new BigDecimal("1.00");
+
+    /** 고정 슬롯 개수. 보드 상단에 자리가 셋뿐이다 */
+    public static final int MAX_PINS = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -71,6 +78,11 @@ public class Piece {
             columnDefinition = "numeric(3,2) default 1.00")
     private BigDecimal scale;
 
+    // 미고정이 기본이라 nullable이다. 1~3은 슬롯 순서이고, 번호가 비는 일(고정 조각 삭제 등)은
+    // 저장값을 그대로 두고 응답에서 다시 매긴다
+    @Column(name = "pin_order")
+    private Short pinOrder;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -92,6 +104,19 @@ public class Piece {
 
     public void updateVisibility(PieceVisibility visibility) {
         this.visibility = visibility;
+    }
+
+    /** 고정 슬롯에 올린다. 순서 범위·중복 검증은 PieceService가 한다. */
+    public void pin(short pinOrder) {
+        this.pinOrder = pinOrder;
+    }
+
+    public void unpin() {
+        this.pinOrder = null;
+    }
+
+    public boolean isPinned() {
+        return pinOrder != null;
     }
 
     /** 보드 위 위치·기울기·배율을 덮어쓴다. 값 검증은 PieceService가 한다. */

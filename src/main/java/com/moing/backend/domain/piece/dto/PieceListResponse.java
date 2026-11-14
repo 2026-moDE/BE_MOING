@@ -27,7 +27,8 @@ public record PieceListResponse(
     ) {}
 
     @JsonPropertyOrder({"id", "review_id", "image_url", "name", "visibility",
-            "position_x", "position_y", "rotation", "scale", "place", "created_at"})
+            "position_x", "position_y", "rotation", "scale", "is_pinned", "pin_order",
+            "place", "created_at"})
     public record PieceItem(
             Long id,
             @JsonProperty("review_id") Long reviewId,
@@ -41,6 +42,9 @@ public record PieceListResponse(
             short rotation,
             // 미설정(scale 도입 이전) 조각도 1.00으로 내려간다
             BigDecimal scale,
+            @JsonProperty("is_pinned") boolean isPinned,
+            // 미고정이면 null. 저장값이 아니라 이 응답에 실린 고정 조각끼리 다시 매긴 1부터의 순서다
+            @JsonProperty("pin_order") Short pinOrder,
             PlaceInfo place,
             // 조각을 만든 시각이 아니라 원본 리뷰의 작성 시각
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")

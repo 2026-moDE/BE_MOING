@@ -3,6 +3,8 @@ package com.moing.backend.domain.piece.controller;
 import com.moing.backend.domain.piece.dto.PieceCreateRequest;
 import com.moing.backend.domain.piece.dto.PieceCreateResponse;
 import com.moing.backend.domain.piece.dto.PieceListResponse;
+import com.moing.backend.domain.piece.dto.PiecePinUpdateRequest;
+import com.moing.backend.domain.piece.dto.PiecePinUpdateResponse;
 import com.moing.backend.domain.piece.dto.PiecePositionUpdateRequest;
 import com.moing.backend.domain.piece.dto.PiecePositionUpdateResponse;
 import com.moing.backend.domain.piece.dto.PieceUpdateRequest;
@@ -37,11 +39,14 @@ public class PieceController {
                 .body(ApiResponse.success("success", pieceService.createPiece(userId, request)));
     }
 
+    // scope: all(기본) | board. 값 검증은 서비스가 한다
     @GetMapping("/users/me/pieces")
     public ResponseEntity<ApiResponse<PieceListResponse>> getMyPieces(
-            @AuthenticationPrincipal Long userId
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) String scope
     ) {
-        return ResponseEntity.ok(ApiResponse.success("success", pieceService.getMyPieces(userId)));
+        return ResponseEntity.ok(ApiResponse.success("success",
+                pieceService.getMyPieces(userId, scope)));
     }
 
     @PatchMapping("/pieces/{id}")
@@ -72,13 +77,24 @@ public class PieceController {
                 pieceService.updatePositions(userId, request)));
     }
 
+    // 경로가 전부 리터럴이라 "/users/{userId}/pieces"(세 마디)와는 마디 수부터 다르다
+    @PutMapping("/users/me/pieces/pins")
+    public ResponseEntity<ApiResponse<PiecePinUpdateResponse>> updatePiecePins(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody PiecePinUpdateRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("success",
+                pieceService.updatePins(userId, request)));
+    }
+
     // "/users/me/pieces"는 리터럴이라 "/users/{userId}/pieces"보다 먼저 매칭된다
     @GetMapping("/users/{userId}/pieces")
     public ResponseEntity<ApiResponse<PieceListResponse>> getUserPieces(
             @AuthenticationPrincipal Long viewerId,
-            @PathVariable Long userId
+            @PathVariable Long userId,
+            @RequestParam(required = false) String scope
     ) {
         return ResponseEntity.ok(ApiResponse.success("success",
-                pieceService.getUserPieces(viewerId, userId)));
+                pieceService.getUserPieces(viewerId, userId, scope)));
     }
 }

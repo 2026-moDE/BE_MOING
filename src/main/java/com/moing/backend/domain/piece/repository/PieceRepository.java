@@ -18,6 +18,9 @@ public interface PieceRepository extends JpaRepository<Piece, Long> {
 
     List<Piece> findByUserIdAndVisibility(Long userId, PieceVisibility visibility);
 
+    // 고정 저장은 기존 고정을 전부 풀고 다시 매기므로 현재 고정된 것만 읽으면 된다
+    List<Piece> findByUserIdAndPinOrderIsNotNull(Long userId);
+
     long countByUserId(Long userId);
 
     // 리뷰 삭제 시 딸린 조각 정리 (건별로 엔티티를 올리지 않도록 벌크로 지운다)

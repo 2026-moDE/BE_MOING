@@ -4,8 +4,11 @@ import com.moing.backend.domain.block.service.BlockService;
 import com.moing.backend.domain.piece.dto.PieceCreateRequest;
 import com.moing.backend.domain.piece.dto.PieceCreateResponse;
 import com.moing.backend.domain.piece.dto.PieceListResponse;
+import com.moing.backend.domain.piece.dto.PiecePinUpdateRequest;
+import com.moing.backend.domain.piece.dto.PiecePinUpdateResponse;
 import com.moing.backend.domain.piece.dto.PiecePositionUpdateRequest;
 import com.moing.backend.domain.piece.dto.PiecePositionUpdateResponse;
+import com.moing.backend.domain.piece.dto.PieceScope;
 import com.moing.backend.domain.piece.dto.PieceUpdateRequest;
 import com.moing.backend.domain.piece.entity.Piece;
 import com.moing.backend.domain.piece.entity.PieceVisibility;
@@ -23,8 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -47,12 +55,16 @@ public class PieceService {
     private static final BigDecimal MAX_SCALE = new BigDecimal("2.0");
     // DECIMAL(3,2) 컬럼과 같은 자리수
     private static final int SCALE_SCALE = 2;
+    // board scope가 "최근"으로 보는 기간. 다른 화면(친구 피드·검색)이 쓰는 72h 기준과 같은 값이다.
+    // 공용 상수는 아직 없고 화면마다 제 상수를 들고 있어 여기도 따로 둔다
+    private static final int BOARD_RECENT_HOURS = 72;
 
     private final PieceRepository pieceRepository;
     private final ReviewRepository reviewRepository;
     private final PlaceRepository placeRepository;
     private final UserRepository userRepository;
     private final BlockService blockService;
+    private final Clock clock;
 
     /**
      * 조각 등록.
@@ -84,9 +96,13 @@ public class PieceService {
         return new PieceCreateResponse(saved.getId());
     }
 
-    /** 내 조각 전체 (원본 리뷰 작성 시각 내림차순) */
-    public PieceListResponse getMyPieces(Long userId) {
-        return toListResponse(pieceRepository.findByUserId(userId), true);
+    /**
+     * 내 조각 목록 (원본 리뷰 작성 시각 내림차순).
+     *
+     * <p>scope가 board면 보드에 붙어 있는 것(고정 + 최근 72h)만 실린다. 생략하면 전체다.
+     */
+    public PieceListResponse getMyPieces(Long userId, String scope) {
+        return toListResponse(pieceRepository.findByUserId(userId), true, toScope(scope));
     }
 
     /**
@@ -99,8 +115,10 @@ public class PieceService {
      * 친구 관계를 한 겹 더 두면 "전체 공개로 올렸는데 친구만 본다"가 되어 두 척도가 겹친다.
      *
      * <p>차단 관계가 있으면 403이다 (타인 프로필·리뷰 목록과 같은 규칙).
+     *
+     * <p>scope는 PUBLIC만 추린 뒤에 적용한다. 남의 PRIVATE 고정 조각이 board에 끼어들 일은 없다.
      */
-    public PieceListResponse getUserPieces(Long viewerId, Long targetUserId) {
+    public PieceListResponse getUserPieces(Long viewerId, Long targetUserId, String scope) {
         if (!userRepository.existsById(targetUserId)) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
@@ -108,7 +126,8 @@ public class PieceService {
         blockService.validateNotBlocked(viewerId, targetUserId);
 
         return toListResponse(
-                pieceRepository.findByUserIdAndVisibility(targetUserId, PieceVisibility.PUBLIC), false);
+                pieceRepository.findByUserIdAndVisibility(targetUserId, PieceVisibility.PUBLIC),
+                false, toScope(scope));
     }
 
     /** 조각 수정. 보낸 필드만 바뀐다. */
@@ -167,6 +186,52 @@ public class PieceService {
         return new PiecePositionUpdateResponse(pieceIds.size());
     }
 
+    /**
+     * 고정 슬롯 저장.
+     *
+     * <p>보낸 목록이 전체를 덮어쓴다 — 기존 고정을 전부 푼 뒤 배열 순서대로 1부터 다시 매긴다.
+     * 빈 배열이면 전부 해제다.
+     *
+     * <p>소유 검증을 먼저 끝내고 나서 손을 대므로, 남의 조각이 하나라도 섞이면 기존 고정은
+     * 그대로 남는다 (한 트랜잭션이라 중간에 끊겨도 전체가 롤백된다).
+     *
+     * <p>공개 범위는 보지 않는다. PRIVATE 조각도 내 보드에는 고정할 수 있고,
+     * 남의 목록에서는 어차피 PUBLIC만 실린다.
+     */
+    @Transactional
+    public PiecePinUpdateResponse updatePins(Long userId, PiecePinUpdateRequest request) {
+        List<Long> pieceIds = request.pieceIds();
+        if (pieceIds.size() > Piece.MAX_PINS
+                || pieceIds.stream().distinct().count() != pieceIds.size()) {
+            throw new CustomException(ErrorCode.INVALID_PIECE_PIN);
+        }
+
+        Map<Long, Piece> pieceMap = pieceRepository.findAllById(pieceIds).stream()
+                .collect(Collectors.toMap(Piece::getId, Function.identity()));
+        List<Piece> targets = pieceIds.stream()
+                .map(pieceId -> {
+                    Piece piece = pieceMap.get(pieceId);
+                    // 배치 저장과 같은 규칙. 없는 id도 남의 조각과 같이 취급한다
+                    if (piece == null || !piece.getUserId().equals(userId)) {
+                        throw new CustomException(ErrorCode.NOT_OWN_PIECE);
+                    }
+                    return piece;
+                })
+                .toList();
+
+        pieceRepository.findByUserIdAndPinOrderIsNotNull(userId).forEach(Piece::unpin);
+
+        List<PiecePinUpdateResponse.PinItem> pins = new ArrayList<>();
+        short order = 1;
+        for (Piece piece : targets) {
+            piece.pin(order);
+            pins.add(new PiecePinUpdateResponse.PinItem(piece.getId(), order));
+            order++;
+        }
+
+        return new PiecePinUpdateResponse(pins.size(), pins);
+    }
+
     private Piece findOwnPiece(Long userId, Long pieceId) {
         Piece piece = pieceRepository.findById(pieceId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PIECE_NOT_FOUND));
@@ -213,14 +278,28 @@ public class PieceService {
         return scale.setScale(SCALE_SCALE, RoundingMode.HALF_UP);
     }
 
+    // 생략은 전체 조회다. 대소문자는 가리지 않고, 모르는 값은 조용히 전체로 넘기지 않고 400으로 끊는다
+    private PieceScope toScope(String scope) {
+        if (scope == null || scope.isBlank()) {
+            return PieceScope.ALL;
+        }
+        try {
+            return PieceScope.valueOf(scope.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_PIECE_SCOPE);
+        }
+    }
+
     /**
      * 조각에 원본 리뷰의 작성 시각과 장소를 붙여 내려준다.
      *
      * <p>리뷰·장소는 연관관계 없이 id만 들고 있어 N+1을 피하려 일괄 조회한다.
      * 리뷰가 ARCHIVED여도 조각은 그대로 보인다. 정렬 기준은 응답에 실리는 created_at,
-     * 즉 리뷰 작성 시각이다 (조각을 만든 순서가 아니다).
+     * 즉 리뷰 작성 시각이다 (조각을 만든 순서가 아니다). 고정 조각도 따로 위로 올리지 않는다 —
+     * 보드에서 자리를 정하는 값은 position_x/y지 목록 순서가 아니다.
      */
-    private PieceListResponse toListResponse(List<Piece> pieces, boolean includeVisibility) {
+    private PieceListResponse toListResponse(List<Piece> pieces, boolean includeVisibility,
+                                             PieceScope scope) {
         if (pieces.isEmpty()) {
             return new PieceListResponse(0, List.of());
         }
@@ -229,20 +308,34 @@ public class PieceService {
                         pieces.stream().map(Piece::getReviewId).distinct().toList()).stream()
                 .collect(Collectors.toMap(Review::getId, Function.identity()));
 
-        List<Long> placeIds = reviewMap.values().stream().map(Review::getPlaceId).distinct().toList();
-        Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
-                .collect(Collectors.toMap(Place::getId, Function.identity()));
-
-        List<PieceListResponse.PieceItem> items = pieces.stream()
+        LocalDateTime boardSince = LocalDateTime.now(clock).minusHours(BOARD_RECENT_HOURS);
+        List<Piece> visible = pieces.stream()
                 // 리뷰를 지우면 조각도 함께 지우므로 정상적으로는 비지 않는다.
                 // 그래도 남은 고아 조각은 시각·장소를 채울 수 없어 목록에서 뺀다
                 .filter(p -> reviewMap.containsKey(p.getReviewId()))
+                .filter(p -> scope != PieceScope.BOARD
+                        || isOnBoard(p, reviewMap.get(p.getReviewId()), boardSince))
+                .toList();
+
+        if (visible.isEmpty()) {
+            return new PieceListResponse(0, List.of());
+        }
+
+        Map<Long, Short> pinOrders = renumberPins(visible);
+
+        List<Long> placeIds = visible.stream()
+                .map(p -> reviewMap.get(p.getReviewId()).getPlaceId()).distinct().toList();
+        Map<Long, Place> placeMap = placeRepository.findAllById(placeIds).stream()
+                .collect(Collectors.toMap(Place::getId, Function.identity()));
+
+        List<PieceListResponse.PieceItem> items = visible.stream()
                 .map(p -> {
                     Review review = reviewMap.get(p.getReviewId());
                     Place place = placeMap.get(review.getPlaceId());
                     PieceListResponse.PlaceInfo placeInfo = place != null
                             ? new PieceListResponse.PlaceInfo(place.getId(), place.getName())
                             : new PieceListResponse.PlaceInfo(review.getPlaceId(), null);
+                    Short pinOrder = pinOrders.get(p.getId());
 
                     return new PieceListResponse.PieceItem(
                             p.getId(), p.getReviewId(), p.getImageUrl(), p.getName(),
@@ -250,6 +343,7 @@ public class PieceService {
                             p.getPositionX(), p.getPositionY(), p.getRotation(),
                             // scale 도입 이전 조각은 컬럼 default로 채워지지만, 값이 비면 기본값으로 내린다
                             p.getScale() != null ? p.getScale() : Piece.DEFAULT_SCALE,
+                            pinOrder != null, pinOrder,
                             placeInfo, review.getCreatedAt());
                 })
                 .sorted(Comparator.comparing(PieceListResponse.PieceItem::createdAt).reversed()
@@ -257,5 +351,28 @@ public class PieceService {
                 .toList();
 
         return new PieceListResponse(items.size(), items);
+    }
+
+    // 고정했거나, 원본 리뷰가 72h 이내면 보드에 붙어 있다. 경계값(정확히 72h 전)은 포함한다
+    private boolean isOnBoard(Piece piece, Review review, LocalDateTime boardSince) {
+        return piece.isPinned() || !review.getCreatedAt().isBefore(boardSince);
+    }
+
+    /**
+     * 응답에 실린 고정 조각끼리 저장값 오름차순으로 1부터 다시 매긴다.
+     *
+     * <p>고정 조각을 지우거나 남의 보드에서 PRIVATE 조각이 빠지면 저장값에 번호가 빈다
+     * (1, 3처럼). 그 구멍을 클라이언트가 떠안지 않도록 응답에서는 늘 1부터 이어지게 만든다.
+     */
+    private Map<Long, Short> renumberPins(List<Piece> pieces) {
+        Map<Long, Short> pinOrders = new HashMap<>();
+        short order = 1;
+        for (Piece piece : pieces.stream()
+                .filter(Piece::isPinned)
+                .sorted(Comparator.comparing(Piece::getPinOrder))
+                .toList()) {
+            pinOrders.put(piece.getId(), order++);
+        }
+        return pinOrders;
     }
 }
